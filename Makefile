@@ -28,6 +28,8 @@ ifeq ($(HAS_PM_DOMAIN),0)
 EXTRA_CFLAGS1 += -DCONFIG_HAS_PM_DOMAIN=0
 endif
 
+EXTRA_CFLAGS1 += -DCONFIG_ADLAK_FIXUP_TIMESTAMP_ENABLE
+
 #CONFIG_MODULE_SIG=n
 
 
@@ -42,6 +44,7 @@ EXTRA_INCLUDE += -I$(KERNEL_SRC)/$(M)/adla/kmd/drv/uapi/linux
 EXTRA_INCLUDE += -I$(KERNEL_SRC)/$(M)/adla/kmd/drv/uapi
 EXTRA_INCLUDE += -I$(KERNEL_SRC)/$(M)/adla/kmd/drv/common/mm
 EXTRA_INCLUDE += -I$(KERNEL_SRC)/$(M)/adla/kmd/drv/common
+EXTRA_INCLUDE += -I$(KERNEL_SRC)/$(M)/adla/kmd/drv/addon
 EXTRA_INCLUDE += -I$(KERNEL_SRC)/$(M)/adla/kmd/drv
 
 # file_adlak_version := $(KERNEL_SRC)/$(M)/adla/kmd/drv/common/adlak_version.h

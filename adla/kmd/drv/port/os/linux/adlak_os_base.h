@@ -45,9 +45,8 @@
 #include <linux/slab.h>
 #include <linux/version.h>
 #include <linux/vmalloc.h>
-#include <linux/sched/task.h>
 #include <uapi/linux/sched/types.h>
-#include <linux/regulator/consumer.h>
+#include <linux/sched/task.h>
 #ifdef CONFIG_COMPAT
 #include <linux/compat.h>
 #endif

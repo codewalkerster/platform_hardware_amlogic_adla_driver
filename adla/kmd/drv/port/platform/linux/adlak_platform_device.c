@@ -28,6 +28,7 @@
 #include "adlak_platform_config.h"
 #include "adlak_profile.h"
 #include "adlak_submit.h"
+#include "adlak_platform_addon.h"
 
 /************************** Constant Definitions *****************************/
 
@@ -174,11 +175,8 @@ static int adlak_platform_remove(struct platform_device *pdev) {
     adlak_device_deinit((void *)padlak);
     adlak_os_mutex_lock(&padlak->dev_mutex);
 
-    ret = adlak_voltage_uninit(padlak);
-    if (ret < 0)
-    {
-        AML_LOG_ERR("voltage uninit fail!\n");
-    }
+    adlak_sys_deinit(padlak);
+
     adlak_platform_free_resource(padlak);
 
     if (misc_dev_en == true) {
@@ -224,17 +222,16 @@ static int adlak_platform_probe(struct platform_device *pdev) {
     if (dma_set_mask_and_coherent(padlak->dev, DMA_BIT_MASK(34))) {
         AML_LOG_WARN("set device dma mask failed,No suitable DMA available!");
     }
-    padlak->net_count = 0;
-    padlak->save_time_en = 0;
+
     ret               = adlak_platform_get_resource(padlak);
     if (ret) {
         goto err_get_res;
     }
-    /* set voltage */
-    ret = adlak_voltage_init(padlak);
+    /* sys init */
+    ret = adlak_sys_init(padlak);
     if (ret < 0)
     {
-        AML_LOG_ERR("voltage init fail!\n");
+        AML_LOG_ERR("sys init fail!\n");
     }
     ret = adlak_platform_request_resource(padlak);
     if (ret) {
@@ -279,11 +276,13 @@ static int adlak_platform_sys_suspend(struct platform_device *pdev, pm_message_t
     int                  pm_suspend;
 
     adlak_os_printf("%s\n", __func__);
+
     if (padlak->is_suspend)
     {
         /* do nothing, if devices has been power off */
         return 0;
     }
+
     adlak_os_mutex_lock(&padlak->dev_mutex);
     padlak->pm_suspend = true;
     adlak_os_mutex_unlock(&padlak->dev_mutex);

@@ -1,11 +1,11 @@
 /*******************************************************************************
- * Copyright (C) 2022 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2024 Amlogic, Inc. All rights reserved.
  ******************************************************************************/
 
 /*****************************************************************************/
 /**
  *
- * @file adlak_mm_mbp.h
+ * @file adlak_mm_mbd.h
  * @brief
  *
  * <pre>
@@ -13,16 +13,17 @@
  *
  * Ver   	Who				Date				Changes
  * ----------------------------------------------------------------------------
- * 1.00a shiwei.sun@amlogic.com	2022/07/13	Initial release
+ * 1.00a shiwei.sun@amlogic.com	2024/03/13	Initial release
  * </pre>
  *
  ******************************************************************************/
 
-#ifndef __ADLAK_MM_MBP_H__
-#define __ADLAK_MM_MBP_H__
+#ifndef __adlak_MM_MBP_H_13DAC1F72CD01573__
+#define __adlak_MM_MBP_H_13DAC1F72CD01573__
 
 /***************************** Include Files *********************************/
-#include "adlak_mm_common.h"
+#include "adlak_mm.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -35,15 +36,12 @@ extern "C" {
 
 /************************** Function Prototypes ******************************/
 
-int  adlak_malloc_through_mbp(struct adlak_mem *mm, struct adlak_mem_handle *mm_info);
-void adlak_free_through_mbp(struct adlak_mem *mm, struct adlak_mem_handle *mm_info);
+void adlak_mem_mbd_unregister(struct adlak_device *padlak, struct adlak_mem_operator *ops);
 
-int adlak_create_mem_pool_from_mbp_uncache(struct adlak_mem *mm);
-
-int adlak_destroy_mem_pool_from_mbp_uncache(struct adlak_mem *mm);
+int adlak_mem_mbd_register(struct adlak_device *padlak, struct adlak_mem_operator *ops);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __ADLAK_MM_MBP_H__ end define*/
+#endif /* __adlak_MM_MBP_H_13DAC1F72CD01573__ end define*/
