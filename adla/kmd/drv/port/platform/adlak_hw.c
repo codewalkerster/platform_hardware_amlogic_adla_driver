@@ -402,8 +402,8 @@ uint32_t adlak_get_hw_status(struct adlak_hw_stat *phw_stat) {
 
     phw_stat->ps_rbf_base    = adlak_read32(region, REG_ADLAK_0X64);
     phw_stat->ps_rbf_size    = adlak_read32(region, REG_ADLAK_0X68);
-    phw_stat->ps_dbg_id      = adlak_read32(region, REG_ADLAK_PS_DBG_SW_ID);
-    phw_stat->ps_module_stat = adlak_read32(region, REG_ADLAK_PS_MODULE_IDLE_STS);
+    phw_stat->ps_dbg_id      = adlak_read32(region, REG_ADLAK_0X90);
+    phw_stat->ps_module_stat = adlak_read32(region, REG_ADLAK_0X8C);
 #endif
     phw_stat->ps_rbf_wpt = adlak_read32(region, REG_ADLAK_0X6C);
     phw_stat->ps_rbf_rpt = adlak_read32(region, REG_ADLAK_0X70);
@@ -450,8 +450,8 @@ void adlak_status_dump(struct adlak_hw_stat *phw_stat) {
     AML_LOG_DEBUG("REG_ADLAK_0X54       : 0x%08X", phw_stat->ps_status);
     AML_LOG_DEBUG("REG_ADLAK_0X60: 0x%08X", phw_stat->irq_status.time_stamp);
     AML_LOG_DEBUG("REG_ADLAK_0X5C  : 0x%08X", phw_stat->ps_idle_status);
-    AML_LOG_DEBUG("REG_ADLAK_PS_DBG_SW_ID : 0x%08X", phw_stat->ps_dbg_id);
-    AML_LOG_DEBUG("REG_ADLAK_PS_MODULE_IDLE_STS  : 0x%08X", phw_stat->ps_module_stat);
+    AML_LOG_DEBUG("REG_ADLAK_0X90 : 0x%08X", phw_stat->ps_dbg_id);
+    AML_LOG_DEBUG("REG_ADLAK_0X8C  : 0x%08X", phw_stat->ps_module_stat);
     if (phw_stat->ps_status & ADLAK_IRQ_MASK_INVALID_IOVA) {
         AML_LOG_DEBUG("REG_ADLAK_0XDC     : 0x%08X", phw_stat->smmu_err_dft_pa);
         AML_LOG_DEBUG("REG_ADLAK_0XE0 : 0x%08X", phw_stat->smmu_err_mdl_id);

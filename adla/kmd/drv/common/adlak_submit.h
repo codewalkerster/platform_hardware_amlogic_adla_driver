@@ -262,6 +262,8 @@ struct adlak_task {
     int32_t               invoke_start_idx;
     int32_t               invoke_end_idx;
     int32_t               invoke_partial;
+    int                   clk_axi_freq_real;
+    int                   clk_core_freq_real;
     //
     uint32_t             cmd_offset_start;
     uint32_t             cmd_offset_end;

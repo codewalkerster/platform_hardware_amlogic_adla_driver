@@ -1749,8 +1749,8 @@ int adlak_wait_until_finished(struct adlak_context *      context,
         stat_desc->start_idx       = ptask->invoke_start_idx;
         stat_desc->end_idx         = ptask->invoke_end_idx;
         stat_desc->profile_rpt     = 0;
-        stat_desc->axi_freq_cur    = padlak->clk_axi_freq_real;
-        stat_desc->core_freq_cur   = padlak->clk_core_freq_real;
+        stat_desc->axi_freq_cur    = ptask->clk_axi_freq_real;
+        stat_desc->core_freq_cur   = ptask->clk_core_freq_real;
         stat_desc->mem_alloced_umd = context->smmu_attr.alloc_byte;
 
         adlak_mem_get_usage(&mem_usage);
@@ -1815,6 +1815,8 @@ int adlak_submit_patch_and_exec(struct adlak_task *ptask) {
         return ret;
     }
 
+    ptask->clk_axi_freq_real          = padlak->clk_axi_freq_real;
+    ptask->clk_core_freq_real         = padlak->clk_core_freq_real;
     ptask->hw_stat.irq_status.timeout = false;
     invoke_num                        = ptask->invoke_end_idx + 1 - ptask->invoke_start_idx;
 
