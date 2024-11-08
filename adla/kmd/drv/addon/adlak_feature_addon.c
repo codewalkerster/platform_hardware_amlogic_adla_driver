@@ -63,4 +63,15 @@ static adla_hw_info t3x_hw_info = {
     .kernel_vlc         = true,
     .feature_vlc        = true,
 };
+static adla_hw_info s6_hw_info = {
+    .hw_ver             = "r3p1",
+    .hw_release_id      = 3,
+    .hw_patch_id        = 1,
+    .mac_no_i8          = 2048,
+    .mac_no_i16         = 512,
+    .max_frq            = 1000,
+    .GOPS               = 4000,
+    .kernel_vlc         = true,
+    .feature_vlc        = true,
+};
 

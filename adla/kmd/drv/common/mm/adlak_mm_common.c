@@ -387,15 +387,11 @@ void adlak_simple_bitmap_pool_deinit(struct adlak_simple_bitmap *p_bitmap) {
 
 int adlak_simple_bitmap_alloc(struct adlak_simple_bitmap *p_bitmap) {
     int id;
-    if (p_bitmap->rpt < p_bitmap->size) {
-        id = p_bitmap->rpt;
-    } else {
-        /* Find the first zero bit and set it */
-        id = find_first_zero_bit(p_bitmap->bitmap_pool, p_bitmap->size);
-        if (id >= p_bitmap->size) {
-            AML_LOG_ERR("No available bit in bitmap\n");
-            return -1; /* No available ID */
-        }
+    /* Find the first zero bit and set it */
+    id = find_first_zero_bit(p_bitmap->bitmap_pool, p_bitmap->size);
+    if (id >= p_bitmap->size) {
+        AML_LOG_ERR("No available bit in bitmap\n");
+        return -1; /* No available ID */
     }
     p_bitmap->rpt = id+1;
     /* Set the bit to mark the ID as used */

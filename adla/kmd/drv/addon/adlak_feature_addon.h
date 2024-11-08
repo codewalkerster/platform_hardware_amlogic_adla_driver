@@ -24,6 +24,7 @@ typedef enum Adla_HW_Version {
     r1p0            = 1,
     r2p0            = 2,
     r3p0            = 3,
+    r3p1            = 4,
 }adla_hw_version;
 
 typedef struct Adla_hw_info {

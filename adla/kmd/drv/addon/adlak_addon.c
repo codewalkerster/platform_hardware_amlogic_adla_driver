@@ -51,6 +51,9 @@ int adlak_get_hw_info (struct adlak_device *padlak, char *buf, size_t size)
         case 0x00000300 :
             hw_info = &t3x_hw_info;
             break;
+        case 0x00000301 :
+            hw_info = &s6_hw_info;
+            break;
         default :
             count = adlak_os_snprintf(buf, buf_size, "devices not support.\n");
             return count;
@@ -137,6 +140,9 @@ int adlak_get_utilization(struct adlak_device *padlak, char *buf, size_t size) {
         case 0x00000100 :
         case 0x00000200 :
         case 0x00000300 :
+            dev_macc_count = 2048 * cur_freq; //Mops
+            break;
+        case 0x00000301 :
             dev_macc_count = 2048 * cur_freq; //Mops
             break;
         default :
