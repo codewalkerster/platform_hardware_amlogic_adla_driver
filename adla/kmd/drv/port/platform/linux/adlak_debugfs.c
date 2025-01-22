@@ -426,8 +426,12 @@ void adlak_destroy_sysfs(void *adlak_device) {
     device_remove_file(padlak->dev, &dev_attr_kmd_version);
     sysfs_remove_groups(&padlak->dev->kobj, adlak_attr_groups);
 }
-
-static ssize_t loglevel_show(struct class *class, struct class_attribute *attr, char *buf) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
+static ssize_t loglevel_show(const struct class *class, const struct class_attribute *attr, char *buf)
+#else
+static ssize_t loglevel_show(struct class *class, struct class_attribute *attr, char *buf)
+#endif
+{
     ssize_t len = 0;
     len += sprintf(buf,
                    "Usage:\n"
@@ -440,9 +444,14 @@ static ssize_t loglevel_show(struct class *class, struct class_attribute *attr, 
     len += sprintf(buf + len, "\ncurrent loglevel = %d\n", g_adlak_log_level);
     return len;
 }
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
+static ssize_t loglevel_store(const struct class *class, const struct class_attribute *attr, const char *buf,
+                              size_t count)
+#else
 static ssize_t loglevel_store(struct class *class, struct class_attribute *attr, const char *buf,
-                              size_t count) {
+                              size_t count)
+#endif
+{
     int res = 0;
     int ret = 0;
     ret     = kstrtoint(buf, 0, &res);

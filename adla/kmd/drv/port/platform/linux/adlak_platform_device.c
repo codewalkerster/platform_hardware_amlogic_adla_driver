@@ -167,8 +167,12 @@ static int adlak_destroy_misc(struct adlak_device *padlak) {
     }
     return 0;
 }
-
-static int adlak_platform_remove(struct platform_device *pdev) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
+static void adlak_platform_remove(struct platform_device *pdev)
+#else
+static int adlak_platform_remove(struct platform_device *pdev)
+#endif
+{
     int                  ret    = 0;
     struct adlak_device *padlak = platform_get_drvdata(pdev);
     AML_LOG_DEBUG("%s", __func__);
@@ -191,7 +195,9 @@ static int adlak_platform_remove(struct platform_device *pdev) {
     adlak_os_free(padlak);
     /* success */
     AML_LOG_INFO("ADLA KMD remove done");
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 16, 0)
     return 0;
+#endif
 }
 
 /**
@@ -366,7 +372,11 @@ static int adlak_class_init(void) {
             return ret;
         }
     }
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
+    adlak_class = class_create(CLASS_NAME);
+#else
     adlak_class = class_create(THIS_MODULE, CLASS_NAME);
+#endif
     if (IS_ERR(adlak_class)) {
         AML_LOG_ERR("class_create failed for adla.");
         ret = ADLAK_PTR_ERR(adlak_class);
