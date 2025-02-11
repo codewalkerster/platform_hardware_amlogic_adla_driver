@@ -442,6 +442,10 @@ int adlak_os_mmap(struct adlak_mem *mm, struct adlak_mem_handle *mm_info, void *
     struct page **               pages = NULL;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
+        mmap_write_lock(current->mm);
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
     vm_flags_set(vma, (VM_IO | VM_DONTCOPY | VM_DONTEXPAND | VM_DONTDUMP));
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0)
     vma->vm_flags |= (VM_IO | VM_DONTCOPY | VM_DONTEXPAND | VM_DONTDUMP);
@@ -472,6 +476,9 @@ int adlak_os_mmap(struct adlak_mem *mm, struct adlak_mem_handle *mm_info, void *
                 pfn = page_to_pfn(pages[i]);
                 if (remap_pfn_range(vma, vma->vm_start + (i * ADLAK_PAGE_SIZE), pfn,
                                     ADLAK_PAGE_SIZE, vma->vm_page_prot)) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
+                    mmap_write_unlock(current->mm);
+#endif
                     return ERR(EAGAIN);
                 }
             }
@@ -493,6 +500,9 @@ int adlak_os_mmap(struct adlak_mem *mm, struct adlak_mem_handle *mm_info, void *
     } else {
         AML_LOG_ERR("Not support memory src [%d]", mm_info->mem_src);
     }
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
+        mmap_write_unlock(current->mm);
+#endif
 
     return 0;
 }

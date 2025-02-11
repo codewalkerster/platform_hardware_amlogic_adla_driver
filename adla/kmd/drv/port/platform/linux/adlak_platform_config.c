@@ -225,7 +225,9 @@ int adlak_platform_get_resource(void *data) {
     struct resource *    res    = NULL;
     struct adlak_device *padlak = (struct adlak_device *)data;
     u32  adla_core_clk_rate = 0;
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
+    int adla_irq = -1;
+#endif
     AML_LOG_DEBUG("%s", __func__);
 
     padlak->smmu_en = adlak_smmu_available(padlak->dev);
@@ -279,6 +281,15 @@ int adlak_platform_get_resource(void *data) {
     }
 
     /* get interrupt number */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
+    adla_irq = platform_get_irq_byname(padlak->pdev, "adla");
+    if (adla_irq <= 0) {
+        AML_LOG_ERR("get irqnum failed");
+        ret = ERR(EINVAL);
+        goto err;
+    }
+    padlak->hw_res.irqline = adla_irq;
+#else
     res = platform_get_resource_byname(padlak->pdev, IORESOURCE_IRQ, "adla");
     if (!res) {
         AML_LOG_ERR("get irqnum failed");
@@ -286,6 +297,7 @@ int adlak_platform_get_resource(void *data) {
         goto err;
     }
     padlak->hw_res.irqline = res->start;
+#endif
     AML_LOG_DEBUG("get IRQ number: %d", padlak->hw_res.irqline);
 
     padlak->hw_timeout_ms = (adlak_sch_time_max_ms);
