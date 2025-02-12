@@ -341,11 +341,19 @@ int adlak_os_alloc_contiguous(struct adlak_mem *mm, struct adlak_mem_handle *mm_
     mm_info->phys_addrs = phys_addrs;
 
     order = get_order(ADLAK_PAGE_ALIGN(size));
-    if (order >= 10) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
+    if (order >= NR_PAGE_ORDERS) {
         AML_LOG_WARN("contiguous alloc contiguous memory order is bigger than MAX, %d >= %d\n",
-                     order, 10);
+                     order, NR_PAGE_ORDERS);
         goto err_order;
     }
+#else
+    if (order >= MAX_ORDER) {
+        AML_LOG_WARN("contiguous alloc contiguous memory order is bigger than MAX, %d >= %d\n",
+                     order, MAX_ORDER);
+        goto err_order;
+    }
+#endif
     gfp |= (GFP_DMA | GFP_USER | __GFP_ZERO);
     if (ADLAK_ENUM_MEMTYPE_INNER_PA_WITHIN_4G & mm_info->req.mem_type) {
         gfp |= (__GFP_DMA32);
@@ -405,7 +413,7 @@ int adlak_os_attach_ext_mem(struct adlak_mem *mm, struct adlak_mem_handle *mm_in
     mm_info->phys_addr = phys_addr;
     for (i = 0; i < mm_info->nr_pages; ++i) {
         phys_addrs[i] = phys_addr + (i * ADLAK_PAGE_SIZE);  // get physical addr
-        AML_LOG_DEBUG("phys_addrs[%d]=0x%llx", i, (uint64_t)(uintptr_t)phys_addrs[i]);
+        AML_LOG_DEBUG("phys_addrs[%d]=0x%lx", i, (uintptr_t)phys_addrs[i]);
     }
     mm_info->pages      = NULL;
     mm_info->phys_addrs = phys_addrs;
@@ -429,7 +437,7 @@ err_alloc_phys_addrs:
 void adlak_os_dettach_ext_mem(struct adlak_mem *mm, struct adlak_mem_handle *mm_info) {
     AML_LOG_DEBUG("%s", __func__);
     if (mm_info->phys_addrs) {
-        // adlak_dma_unmap_of_contiguous(mm, mm_info);
+//        adlak_dma_unmap_of_contiguous(mm, mm_info);
         adlak_os_free(mm_info->phys_addrs);
     }
 }

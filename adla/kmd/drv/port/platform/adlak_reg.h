@@ -31,84 +31,84 @@ extern "C" {
 /* registers                                                                  */
 /*----------------------------------------------------------------------------*/
 
-#define REG_ADLAK_0X0 (0x0) /* read,default=0x0 */
+#define REG_ADLAK_REV (0x0) /* read,default=0x0 */
 
-#define REG_ADLAK_0X4 (0x4) /* read/write,default=0xff */
+#define REG_ADLAK_WAIT_TIMER (0x4) /* read/write,default=0xff */
 #define REG_ADLAK_SECURITY (0x8)   /* read */
 // irq
-#define REG_ADLAK_0X10 (0x10) /* read,default=0x0 */
-#define REG_ADLAK_0X14 (0x14)   /* read/write,default=0x0 */
-#define REG_ADLAK_0X18 (0x18)    /* read/write,default=0x0 */
-#define REG_ADLAK_0X1C (0x1C) /* read,default=0x0 */
+#define REG_ADLAK_IRQ_MASKED (0x10) /* read,default=0x0 */
+#define REG_ADLAK_IRQ_MASK (0x14)   /* read/write,default=0x0 */
+#define REG_ADLAK_IRQ_RAW (0x18)    /* read/write,default=0x0 */
+#define REG_ADLAK_STS_REPORT (0x1C) /* read,default=0x0 */
 // power&clock
-#define REG_ADLAK_0X20 (0x20)        /* read/write,default=0x0 */
-#define REG_ADLAK_0X24 (0x24)     /* read/write,default=0x0 */
-#define REG_ADLAK_0X28 (0x28)  /* read/write,default=0x0 */
-#define REG_ADLAK_0X2C (0x2c) /* read/write,default=0x1008 */
+#define REG_ADLAK_SWRST (0x20)        /* read/write,default=0x0 */
+#define REG_ADLAK_ADLAK_EN (0x24)     /* read/write,default=0x0 */
+#define REG_ADLAK_CLK_AUTOCLK (0x28)  /* read/write,default=0x0 */
+#define REG_ADLAK_CLK_IDLE_CNT (0x2c) /* read/write,default=0x1008 */
 // debug
-#define REG_ADLAK_0X30 (0x30)        /* read/write,default=0x0 */
-#define REG_ADLAK_0X34 (0x34)       /* read/write,default=0x0 */
-#define REG_ADLAK_0X38 (0x38)   /* read/write,default=0x0 */
-#define REG_ADLAK_0X3C (0x3c)       /* read,default=0x0 */
-#define REG_ADLAK_0X40 (0x40) /* read/write,default=0x0 */
-#define REG_ADLAK_0X44 (0x44) /* read/write,default=0x0 */
-#define REG_ADLAK_0X48 (0x48) /* read/write,default=0x0 */
-#define REG_ADLAK_0X4C (0x4c) /* read,default=0x0 */
+#define REG_ADLAK_DBG_EN (0x30)        /* read/write,default=0x0 */
+#define REG_ADLAK_DBG_SEL (0x34)       /* read/write,default=0x0 */
+#define REG_ADLAK_DBG_SUB_SEL (0x38)   /* read/write,default=0x0 */
+#define REG_ADLAK_DBG_DAT (0x3c)       /* read,default=0x0 */
+#define REG_ADLAK_DBG_SRAM_CTRL (0x40) /* read/write,default=0x0 */
+#define REG_ADLAK_DBG_SRAM_ADDR (0x44) /* read/write,default=0x0 */
+#define REG_ADLAK_DBG_SRAM_WDAT (0x48) /* read/write,default=0x0 */
+#define REG_ADLAK_DBG_SRAM_RDAT (0x4c) /* read,default=0x0 */
 
 // parser
-#define REG_ADLAK_0X50 (0x50)            /* read/write,default=0x0 */
-#define REG_ADLAK_0X54 (0x54)             /* read,default=0x0 */
-#define REG_ADLAK_0X58 (0x58)         /* read,default=0x0 */
-#define REG_ADLAK_0X5C (0x5c)        /* read,default=0x0 */
-#define REG_ADLAK_0X60 (0x60)      /* read,default=0x0 */
-#define REG_ADLAK_0X64 (0x64)        /* read/write,default=0x0 */
-#define REG_ADLAK_0X68 (0x68)        /* read/write,default=0x0 */
-#define REG_ADLAK_0X6C (0x6c)         /* read/write,default=0x0 */
-#define REG_ADLAK_0X70 (0x70)         /* read,default=0x0 */
-#define REG_ADLAK_0X74 (0x74)         /* read,default=0x0 */
-#define REG_ADLAK_0X78 (0x78)       /* read,default=0x0 */
-#define REG_ADLAK_0X7C (0x7c)            /* read,default=0x0 */
-#define REG_ADLAK_0X80 (0x80)             /* read/write,default=0x4 */
-#define REG_ADLAK_0X84 (0x84)         /* read/write,default=0x0 */
-#define REG_ADLAK_0X88 (0x88)        /* read/write,default=0x0 */
-#define REG_ADLAK_0X8C (0x8c) /* read,default=0x0 */
-#define REG_ADLAK_0X90 (0x90)       /* read,default=0x0 */
-#define REG_ADLAK_0X9C (0x9C)       /* read/write,default=0x0 */
-#define REG_ADLAK_0XA0 (0xa0)             /* read/write,default=0x0 */
-#define REG_ADLAK_0XA4 (0xa4)       /* read/write,default=0x0 */
-#define REG_ADLAK_0XA8 (0xa8)       /* read/write,default=0x0 */
-#define REG_ADLAK_0XAC (0xac)       /* read/write,default=0x30011111 */
-#define REG_ADLAK_0XB0 (0xb0)       /* read/write,default=0x11111 */
-#define REG_ADLAK_0XB4 (0xb4)       /* read/write,default=0x211 */
-#define REG_ADLAK_0XB8 (0xb8)          /* read/write,default=0x0 */
-#define REG_ADLAK_0XBC (0xbc)        /* read/write,default=0x440044 */
+#define REG_ADLAK_PS_CTRL (0x50)            /* read/write,default=0x0 */
+#define REG_ADLAK_PS_STS (0x54)             /* read,default=0x0 */
+#define REG_ADLAK_PS_ERR_DAT (0x58)         /* read,default=0x0 */
+#define REG_ADLAK_PS_IDLE_STS (0x5c)        /* read,default=0x0 */
+#define REG_ADLAK_PS_TIME_STAMP (0x60)      /* read,default=0x0 */
+#define REG_ADLAK_PS_RBF_BASE (0x64)        /* read/write,default=0x0 */
+#define REG_ADLAK_PS_RBF_SIZE (0x68)        /* read/write,default=0x0 */
+#define REG_ADLAK_PS_RBF_WPT (0x6c)         /* read/write,default=0x0 */
+#define REG_ADLAK_PS_RBF_RPT (0x70)         /* read,default=0x0 */
+#define REG_ADLAK_PS_RBF_PPT (0x74)         /* read,default=0x0 */
+#define REG_ADLAK_PS_FINISH_ID (0x78)       /* read,default=0x0 */
+#define REG_ADLAK_PS_HCNT (0x7c)            /* read,default=0x0 */
+#define REG_ADLAK_PS_OST (0x80)             /* read/write,default=0x4 */
+#define REG_ADLAK_PS_PEND_EN (0x84)         /* read/write,default=0x0 */
+#define REG_ADLAK_PS_PEND_VAL (0x88)        /* read/write,default=0x0 */
+#define REG_ADLAK_PS_MODULE_IDLE_STS (0x8c) /* read,default=0x0 */
+#define REG_ADLAK_PS_DBG_SW_ID (0x90)       /* read,default=0x0 */
+#define REG_ADLAK_AB_AXI_PADDR (0x9C)       /* read/write,default=0x0 */
+#define REG_ADLAK_AB_CTL (0xa0)             /* read/write,default=0x0 */
+#define REG_ADLAK_AB_AXI_SADDR (0xa4)       /* read/write,default=0x0 */
+#define REG_ADLAK_AB_AXI_EADDR (0xa8)       /* read/write,default=0x0 */
+#define REG_ADLAK_AB_R_CS_PRIO (0xac)       /* read/write,default=0x30011111 */
+#define REG_ADLAK_AB_R_LS_PRIO (0xb0)       /* read/write,default=0x11111 */
+#define REG_ADLAK_AB_R_L2_PRIO (0xb4)       /* read/write,default=0x211 */
+#define REG_ADLAK_AB_W_PRIO (0xb8)          /* read/write,default=0x0 */
+#define REG_ADLAK_AB_AXI_USER (0xbc)        /* read/write,default=0x440044 */
 // smmu
-#define REG_ADLAK_0XC0 (0xc0)          /* read/write,default=0x0 */
-#define REG_ADLAK_0XC4 (0xc4)      /* read/write,default=0x0 */
-#define REG_ADLAK_0XC8 (0xc8)      /* read/write,default=0x0 */
-#define REG_ADLAK_0XCC (0xcc) /* read/write,default=0x11111111 */
-#define REG_ADLAK_0XD0 (0xd0) /* read/write,default=0x111111 */
-#define REG_ADLAK_0XD4 (0xd4)     /* read/write,default=0x0 */
-#define REG_ADLAK_0XD8 (0xd8)      /* read/write,default=0x0 */
-#define REG_ADLAK_0XDC (0xdc)         /* read/write,default=0x0 */
-#define REG_ADLAK_0XE0 (0xe0)     /* read,default=0x0 */
-#define REG_ADLAK_0XE4 (0xe4)      /* read,default=0x0 */
+#define REG_ADLAK_SMMU_EN (0xc0)          /* read/write,default=0x0 */
+#define REG_ADLAK_SMMU_TTBR_L (0xc4)      /* read/write,default=0x0 */
+#define REG_ADLAK_SMMU_TTBR_H (0xc8)      /* read/write,default=0x0 */
+#define REG_ADLAK_SMMU_PRIO_POW2_0 (0xcc) /* read/write,default=0x11111111 */
+#define REG_ADLAK_SMMU_PRIO_POW2_1 (0xd0) /* read/write,default=0x111111 */
+#define REG_ADLAK_SMMU_INV_CTL (0xd4)     /* read/write,default=0x0 */
+#define REG_ADLAK_SMMU_INV_VA (0xd8)      /* read/write,default=0x0 */
+#define REG_ADLAK_SMMU_DFT (0xdc)         /* read/write,default=0x0 */
+#define REG_ADLAK_SMMU_IVD_MDL (0xe0)     /* read,default=0x0 */
+#define REG_ADLAK_SMMU_IVD_VA (0xe4)      /* read,default=0x0 */
 // pm
-#define REG_ADLAK_0XF0 (0xf0)       /* read/write,default=0x0 */
-#define REG_ADLAK_0XF4 (0xf4) /* read/write,default=0x0 */
-#define REG_ADLAK_0XF8 (0xf8) /* read/write,default=0x0 */
-#define REG_ADLAK_0XFC (0xfc)  /* read,default=0x0 */
-#define REG_ADLAK_0X100 (0x100) /* read/write,default=0x0 */
-#define REG_ADLAK_0X104 (0x104)     /* read/write,default=0x0 */
-#define REG_ADLAK_0X108 (0x108)    /* read/write,default=0x0 */
+#define REG_ADLAK_PM_EN (0xf0)       /* read/write,default=0x0 */
+#define REG_ADLAK_PM_RBF_BASE (0xf4) /* read/write,default=0x0 */
+#define REG_ADLAK_PM_RBF_SIZE (0xf8) /* read/write,default=0x0 */
+#define REG_ADLAK_PM_RBF_WPT (0xfc)  /* read,default=0x0 */
+#define REG_ADLAK_PM_RBF_RPT (0x100) /* read/write,default=0x0 */
+#define REG_ADLAK_PM_STS (0x104)     /* read/write,default=0x0 */
+#define REG_ADLAK_PM_UNIT (0x108)    /* read/write,default=0x0 */
 // AXI DRAM
-#define REG_ADLAK_0X110 (0x110)  /* read/write,default=0x0 */
-#define REG_ADLAK_0X114 (0x114) /* read/write,default=0x80808080 */
+#define REG_ADLAK_AXIBRG_DX_CTL (0x110)  /* read/write,default=0x0 */
+#define REG_ADLAK_AXIBRG_DX_HOLD (0x114) /* read/write,default=0x80808080 */
 // AXI SRAM
-#define REG_ADLAK_0X118 (0x118)  /* read/write,default=0x0 */
-#define REG_ADLAK_0X11C (0x11c) /* read/write,default=0x80808080 */
+#define REG_ADLAK_AXIBRG_SX_CTL (0x118)  /* read/write,default=0x0 */
+#define REG_ADLAK_AXIBRG_SX_HOLD (0x11c) /* read/write,default=0x80808080 */
 
-#define REG_ADLAK_0X120 (0x120)       /* read/write,default=0x0 */
+#define REG_ADLAK_MC_CTL (0x120)       /* read/write,default=0x0 */
 #define REG_ADLAK_MC_CLK_PHASE (0x124) /* read/write,default=0x0 */
 
 #define REG_ADLAK_NUM_MAX (68)
@@ -116,10 +116,10 @@ extern "C" {
 #define ADLAK_IRQ_MASK_PARSER_STOP_CMD (1 << 0) /* [0]: parser stop for command*/
 #define ADLAK_IRQ_MASK_PARSER_STOP_ERR (1 << 1) /* [1]: parser stop for error*/
 #define ADLAK_IRQ_MASK_PARSER_STOP_PMT (1 << 2) /* [2]: parser stop for preempt*/
-#define ADLAK_IRQ_MASK_PEND_TIMOUT (1 << 3)     /* [3]: pending timer timeout*/
+#define ADLAK_IRQ_MASK_PEND_TIMEOUT (1 << 3)     /* [3]: pending timer timeout*/
 #define ADLAK_IRQ_MASK_LAYER_END (1 << 4)       /* [4]: layer end event*/
 #define ADLAK_IRQ_MASK_TIM_STAMP (1 << 5)       /* [5]: time_stamp irq event*/
-#define ADLAK_IRQ_MASK_APB_WAIT_TIMOUT (1 << 6) /* [6]: apb wait timer timeout*/
+#define ADLAK_IRQ_MASK_APB_WAIT_TIMEOUT (1 << 6) /* [6]: apb wait timer timeout*/
 #define ADLAK_IRQ_MASK_PM_DRAM_OVF (1 << 7)     /* [7]: pm dram overflow*/
 #define ADLAK_IRQ_MASK_PM_FIFO_OVF (1 << 8)     /* [8]: pm fifo overflow*/
 #define ADLAK_IRQ_MASK_PM_ARBITER_OVF (1 << 9)  /* [9]: pm arbiter overflow*/

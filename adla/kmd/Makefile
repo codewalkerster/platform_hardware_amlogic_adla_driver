@@ -19,5 +19,6 @@ adla_core-objs += drv/common/adlak_profile.o
 adla_core-objs += drv/common/adlak_mm.o
 adla_core-objs += drv/common/adlak_device.o
 adla_core-objs += drv/common/adlak_submit.o
+adla_core-objs += drv/common/adlak_tee.o
 adla_core-objs += drv/addon/adlak_addon.o
 adla_core-objs += drv/addon/adlak_platform_addon.o

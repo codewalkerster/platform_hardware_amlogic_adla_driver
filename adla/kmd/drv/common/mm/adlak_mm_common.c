@@ -312,7 +312,7 @@ ret:
 }
 
 int adlak_mem_uid_init(void) {
-    int                      ret = 0;
+    int ret = 0;
     if (!ptr_mem_uid) {
         ptr_mem_uid = adlak_os_zalloc(sizeof(*ptr_mem_uid), ADLAK_GFP_KERNEL);
         if (unlikely(!ptr_mem_uid)) {
@@ -347,7 +347,7 @@ uint64_t adlak_mem_uid_alloc(void) {
     if (ptr_mem_uid) {
         id = adlak_simple_bitmap_alloc(ptr_mem_uid);
         if (id >= 0) {
-            uid = id << ADLAK_MM_POOL_PAGE_SHIFT;
+            uid = (uint64_t)id << ADLAK_MM_POOL_PAGE_SHIFT;
         }
     }
     if (ADLAK_INVALID_ADDR == uid) {
@@ -393,7 +393,7 @@ int adlak_simple_bitmap_alloc(struct adlak_simple_bitmap *p_bitmap) {
         AML_LOG_ERR("No available bit in bitmap\n");
         return -1; /* No available ID */
     }
-    p_bitmap->rpt = id+1;
+    p_bitmap->rpt = id + 1;
     /* Set the bit to mark the ID as used */
     set_bit(id, p_bitmap->bitmap_pool);
     return id;

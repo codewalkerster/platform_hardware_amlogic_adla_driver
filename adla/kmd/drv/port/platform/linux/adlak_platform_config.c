@@ -34,21 +34,21 @@
 static struct platform_device *pdev = NULL;
 #endif
 
-static uint irqline = 0;
+//static uint irqline = 0;
 
-static uint registerMemBase = 0;
+//static uint registerMemBase = 0;
 
-static uint registerMemSize = 0;
+//static uint registerMemSize = 0;
 
-static uint contiguousMemBase = 0;
+//static uint contiguousMemBase = 0;
 
-static uint contiguousMemSize = 0;
+//static uint contiguousMemSize = 0;
 
-static uint contiguousSramBase = 0;
+//static uint contiguousSramBase = 0;
 
-static uint contiguousSramSize = 0;
+//static uint contiguousSramSize = 0;
 
-static int adlak_has_smmu = -1;
+//static int adlak_has_smmu = -1;
 
 static int adlak_dependency_mode = ADLAK_DEPENDENCY_MODE_MODULE_LAYER;
 
@@ -70,7 +70,9 @@ static uint adlak_share_buf_size = 0;
 
 static uint adlak_smmu_iova_size = 4;
 
-#include "./adlak_platform_module_param.c"
+static uint adlak_submit_blocking = 0;
+
+//#include "./adlak_platform_module_param.c"
 /**************************** Type Definitions *******************************/
 
 /***************** Macros (Inline Functions) Definitions *********************/
@@ -137,16 +139,16 @@ static struct platform_device adlak_pdev        = {
 static void adlak_drv_show_param(void) {
     AML_LOG_DEBUG("%s", __func__);
     AML_LOG_DEFAULT("");
-    AML_LOG_DEFAULT("registerMemBase         0x%08llX, ", (uint64_t)adlak_resource[0].start);
-    AML_LOG_DEFAULT("registerMemSize         0x%08llX, ",
-                    (uint64_t)(adlak_resource[0].end + 1 - adlak_resource[0].start));
-    AML_LOG_DEFAULT("contiguousMemBase       0x%08llX, ", (uint64_t)adlak_resource[1].start);
-    AML_LOG_DEFAULT("contiguousMemSize       0x%08llX, ",
-                    (uint64_t)(adlak_resource[1].end + 1 - adlak_resource[1].start));
-    AML_LOG_DEFAULT("irqline                 0x%08llX, ", (uint64_t)adlak_resource[2].start);
-    AML_LOG_DEFAULT("contiguousSramBase      0x%08llX, ", (uint64_t)adlak_resource[3].start);
-    AML_LOG_DEFAULT("contiguousSramSize      0x%08llX, ",
-                    (uint64_t)(adlak_resource[3].end + 1 - adlak_resource[3].start));
+    AML_LOG_DEFAULT("registerMemBase         0x%08lX, ", (uintptr_t)adlak_resource[0].start);
+    AML_LOG_DEFAULT("registerMemSize         0x%08lX, ",
+                    (uintptr_t)(adlak_resource[0].end + 1 - adlak_resource[0].start));
+    AML_LOG_DEFAULT("contiguousMemBase       0x%08lX, ", (uintptr_t)adlak_resource[1].start);
+    AML_LOG_DEFAULT("contiguousMemSize       0x%08lX, ",
+                    (uintptr_t)(adlak_resource[1].end + 1 - adlak_resource[1].start));
+    AML_LOG_DEFAULT("irqline                 0x%08lX, ", (uintptr_t)adlak_resource[2].start);
+    AML_LOG_DEFAULT("contiguousSramBase      0x%08lX, ", (uintptr_t)adlak_resource[3].start);
+    AML_LOG_DEFAULT("contiguousSramSize      0x%08lX, ",
+                    (uintptr_t)(adlak_resource[3].end + 1 - adlak_resource[3].start));
     AML_LOG_DEFAULT("\n");
 }
 
@@ -224,7 +226,6 @@ int adlak_platform_get_resource(void *data) {
     int                  ret    = 0;
     struct resource *    res    = NULL;
     struct adlak_device *padlak = (struct adlak_device *)data;
-    u32  adla_core_clk_rate = 0;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
     int adla_irq = -1;
 #endif
@@ -323,19 +324,12 @@ int adlak_platform_get_resource(void *data) {
     if (IS_ERR(padlak->clk_core)) {
         AML_LOG_ERR("Failed to get adla_core_clk\n");
     }
-
 #ifdef CONFIG_OF
-    of_property_read_u32(padlak->dev->of_node, "adla_core_clk_rate", &adla_core_clk_rate);
+    // update  the core clock if defined in device tree
+    of_property_read_s32(padlak->dev->of_node, "adla_core_clk_rate", &adlak_core_freq);
 #endif
-
-    if (adla_core_clk_rate != 0) {
-        padlak->clk_axi_freq_set  = adla_core_clk_rate;
-        padlak->clk_core_freq_set = adla_core_clk_rate;
-    } else {
-        padlak->clk_axi_freq_set  = adlak_axi_freq;
-        padlak->clk_core_freq_set = adlak_core_freq;
-    }
-
+    padlak->clk_axi_freq_set  = adlak_axi_freq;
+    padlak->clk_core_freq_set = adlak_core_freq;
     padlak->dpm_period_set    = adlak_dpm_period;
 
     if (adlak_log_level != -1) {
@@ -357,18 +351,26 @@ int adlak_platform_get_resource(void *data) {
         padlak->iova_max_size_GB = adlak_smmu_iova_size;
     }
 
+    if (1 == adlak_submit_blocking) {
+        padlak->submit_blocking = 1;
+    } else {
+        padlak->submit_blocking = 0;
+    }
+    AML_LOG_INFO("submit_blocking %d \n", padlak->submit_blocking);
     return 0;
 err:
     return ret;
 }
 
 int adlak_platform_get_rsv_mem_size(void *dev, uint64_t *mem_size) {
+    uint64_t size = 0;
+#ifdef CONFIG_OF
     int                 ret = 0;
     struct resource     res;
-    uint64_t            size;
     const __be32 *      ranges = NULL;
     int                 nsize;
     struct device_node *res_mem_dev;
+
     /* find a memory-region phandle */
     res_mem_dev = of_parse_phandle(((struct device *)dev)->of_node, "memory-region", 0);
     if (!res_mem_dev) {
@@ -388,6 +390,7 @@ int adlak_platform_get_rsv_mem_size(void *dev, uint64_t *mem_size) {
         }
         size = of_read_number(ranges, nsize);
     }
+#endif
     AML_LOG_DEBUG("get cma size=0x%lX", (uintptr_t)size);
     *mem_size = size;
     return 0;
@@ -486,25 +489,25 @@ void adlak_platform_set_clock(void *data, bool enable, int core_freq, int axi_fr
                 }
                 padlak->is_clk_core_enabled = true;
             }
-            if (!ADLAK_IS_ERR_OR_NULL(padlak->clk_axi)) {
-                clk_set_rate(padlak->clk_axi, axi_freq);
-                if (ret) {
-                    AML_LOG_ERR("Failed to set adla_axi_clk\n");
-                }
-                padlak->clk_axi_freq_real = (int)clk_get_rate(padlak->clk_axi);
-                adlak_os_printf("adlak_axi clk requirement of %d Hz,and real val is %d Hz.",
-                                axi_freq, padlak->clk_axi_freq_real);
+        }
+        if (!ADLAK_IS_ERR_OR_NULL(padlak->clk_axi)) {
+            clk_set_rate(padlak->clk_axi, axi_freq);
+            if (ret) {
+                AML_LOG_ERR("Failed to set adla_axi_clk\n");
             }
-            if (!ADLAK_IS_ERR_OR_NULL(padlak->clk_core)) {
-                ret = clk_set_rate(padlak->clk_core, core_freq);
-                if (ret) {
-                    AML_LOG_ERR("Failed to set adla_core_clk\n");
-                }
-                padlak->clk_core_freq_real = (int)clk_get_rate(padlak->clk_core);
+            padlak->clk_axi_freq_real = (int)clk_get_rate(padlak->clk_axi);
+            adlak_os_printf("adlak_axi clk requirement of %d Hz,and real val is %d Hz.", axi_freq,
+                            padlak->clk_axi_freq_real);
+        }
+        if (!ADLAK_IS_ERR_OR_NULL(padlak->clk_core)) {
+            ret = clk_set_rate(padlak->clk_core, core_freq);
+            if (ret) {
+                AML_LOG_ERR("Failed to set adla_core_clk\n");
+            }
+            padlak->clk_core_freq_real = (int)clk_get_rate(padlak->clk_core);
 
-                AML_LOG_DEBUG("adlak_core clk requirement of %d Hz,and real val is %d Hz.",
-                                core_freq, padlak->clk_core_freq_real);
-            }
+            AML_LOG_DEBUG("adlak_core clk requirement of %d Hz,and real val is %d Hz.", core_freq,
+                            padlak->clk_core_freq_real);
         }
     }
     adlak_dpm_clk_update(padlak, core_freq, axi_freq);

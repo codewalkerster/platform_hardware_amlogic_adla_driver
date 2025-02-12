@@ -549,7 +549,7 @@ static struct adlak_mem_handle *adlak_cma_attach(struct adlak_context_smmu_attr 
     if (!ret) {
         pbuf_req->errcode = 0;
     } else {
-        pbuf_req->errcode = ret;
+        pbuf_req->errcode = (int32_t)ret;
         adlak_mem_uid_free(mm_info->uid);
         adlak_os_free(mm_info);
         mm_info = (void *)NULL;

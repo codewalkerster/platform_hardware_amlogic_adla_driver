@@ -77,7 +77,10 @@ struct adlak_context {
 #ifdef CONFIG_ADLAK_DEBUG_INNNER
     struct adlak_dbg_info *dbg_info;
 #endif
-    struct adlak_model_attr *pmodel_attr;
+
+    int32_t                   invoke_count;
+    uint32_t                  sub_tasks_count;
+    struct adlak_model_attr **pmodel_attr_list;
 
     struct adlak_context_smmu_attr smmu_attr;
 
@@ -87,6 +90,9 @@ struct adlak_context {
     int64_t              macc_count; /* macc Bytes */
 
     adlak_os_sema_t ctx_idle;
+
+    struct adlak_tee_model_attr *ptee_model_attr;
+    uint32_t                     secure_heap_handle;
 };
 
 /************************** Function Prototypes ******************************/
@@ -138,13 +144,12 @@ void *adlak_context_dettach_buf(struct adlak_context *context, void *mm_info);
 int adlak_destroy_all_context(struct adlak_device *padlak);
 
 /**
- * @brief destroy task from context by net_id
+ * @brief destroy task from context
  *
  * @param context
- * @param net_id
  * @return int
  */
-int adlak_net_dettach_by_id(struct adlak_context *context, int net_id);
+int adlak_net_dettach(struct adlak_context *context);
 
 /**
  * @brief flush all memory in the context
@@ -170,6 +175,11 @@ int adlak_context_invalid_cache(struct adlak_context *context);
  * @return struct context_buf*
  */
 struct context_buf *find_buffer_by_desc(struct adlak_context *context, void *pmm_info);
+
+struct adlak_model_attr *adlak_get_model_attr(struct adlak_context *context,
+                                              uint32_t              sub_tasks_idx);
+
+void adlak_clear_model_attr(struct adlak_context *context, uint32_t sub_tasks_idx);
 
 #ifdef __cplusplus
 }

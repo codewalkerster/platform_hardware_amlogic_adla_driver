@@ -290,8 +290,6 @@ static ssize_t dpm_period_show(struct device *dev, struct device_attribute *attr
         count = adlak_os_snprintf(buf, buf_size, "Adla power on.\n");
     }
     count += adlak_os_snprintf(buf + count, buf_size - count, "Adla dpm period  is %d ms.\n", padlak->queue.dev_inference.dpm_period_set);
-    // count += adlak_os_snprintf(buf, MAX_CHAR_SYSFS, "Adla dpm period  is %d ms.\n",padlak->queue.dev_inference.dpm_period_set);
-
     return count;
 }
 static ssize_t dpm_period_store(struct device *dev, struct device_attribute *attr, const char *buf,
@@ -397,7 +395,7 @@ static const struct attribute_group adlak_debug_attr_group = {
 };
 
 static const struct attribute_group *adlak_attr_groups[] = {
-#if 1 //ADLAK_DEBUG
+#if 1
     &adlak_debug_attr_group,
 #endif
     NULL,
@@ -564,6 +562,11 @@ static ssize_t adla_debugfs_reg_write(struct file *file, const char __user *ubuf
         adlak_platform_resume(padlak);
     }
 
+/*
+    if (padlak->is_suspend) {
+        adlak_dpm_stage_adjust(padlak, ADLAK_DPM_STRATEGY_MAX);
+    }
+*/
     ret = sscanf(buf, "%x %x",&offset, &value);
     switch (ret) {
         case 1:
@@ -647,7 +650,6 @@ static ssize_t adla_debugfs_dpm_period_read(struct file *file, char __user *ubuf
     } else {
         len = adlak_os_snprintf(buf, buf_size, "Adla power on.\n");
     }
-    //len += adlak_os_snprintf(buf + count, buf_size - count, "Adla dpm period  is %d ms.\n",padlak->dpm_period_set);
     len += adlak_os_snprintf(buf + len, buf_size - len, "Adla dpm period  is %d ms.\n",padlak->queue.dev_inference.dpm_period_set);
 
     return simple_read_from_buffer(ubuf, count, ppos, buf, len);
@@ -715,3 +717,4 @@ void adlak_destroy_debugfs(void *adlak_device) {
         adlak_debugfs_parent = NULL;
     }
 }
+

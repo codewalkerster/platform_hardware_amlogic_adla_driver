@@ -79,6 +79,14 @@ static long drv_ioctl(struct file *filp, unsigned int ioctl_code, unsigned long 
     struct adlak_dev_info_set_req        dev_info_set;
     uint64_t                             mem_handle;
     u_long                               size;
+    struct adlak_networks_desc           nets_reg_desc;
+
+#ifdef CONFIG_ADLAK_TEE
+    struct adlak_tee_network_desc        tee_net_reg_desc;
+    struct adlak_tee_network_invoke_desc tee_invoke_desc;
+    struct adlak_tee_query_addr          tee_query_addr;
+    struct adlak_tee_protect_addr        tee_protect_addr;
+#endif
     AML_LOG_DEBUG("%s", __func__);
 
     size = (ioctl_code & IOCSIZE_MASK) >> IOCSIZE_SHIFT;
@@ -228,7 +236,7 @@ static long drv_ioctl(struct file *filp, unsigned int ioctl_code, unsigned long 
             if (ret) {
                 break;
             }
-            ret = adlak_net_register_request(context, &net_reg_desc);
+            ret = adlak_net_register_request(context, &net_reg_desc, 0);
 
             adlak_os_mutex_unlock(&padlak->dev_mutex);
             /* copy buf info/errcode to user for reference */
@@ -238,6 +246,31 @@ static long drv_ioctl(struct file *filp, unsigned int ioctl_code, unsigned long 
             }
 
             break;
+
+        case ADLAK_IOCTL_REGISTER_NETWORKS:
+
+            AML_LOG_DEBUG("ADLAK_IOCTL_REGISTER_NETWORKS");
+            ret = copy_from_user(&nets_reg_desc, udata, sizeof(struct adlak_networks_desc));
+            if (ret) {
+                AML_LOG_ERR("net_reg_desc copy from user failed!");
+                ret = ERR(EFAULT);
+                break;
+            }
+            ret = adlak_os_mutex_lock(&padlak->dev_mutex);
+            if (ret) {
+                break;
+            }
+            ret = adlak_nets_register_request(context, &nets_reg_desc);
+
+            adlak_os_mutex_unlock(&padlak->dev_mutex);
+            /* copy buf info/errcode to user for reference */
+            cp_ret = copy_to_user(udata, &nets_reg_desc, sizeof(struct adlak_networks_desc));
+            if ((ERR(NONE) == ret) && (ERR(NONE) != cp_ret)) {
+                ret = cp_ret;
+            }
+
+            break;
+
         case ADLAK_IOCTL_DESTROY_NETWORK:
 
             AML_LOG_DEBUG("ADLAK_IOCTL_DESTROY_NETWORK");
@@ -255,12 +288,13 @@ static long drv_ioctl(struct file *filp, unsigned int ioctl_code, unsigned long 
 
             adlak_os_mutex_unlock(&padlak->dev_mutex);
             /* copy buf info/errcode to user for reference */
-            cp_ret = copy_to_user(udata, &net_reg_desc, sizeof(struct adlak_network_del_desc));
+            cp_ret = copy_to_user(udata, &net_unreg_dec, sizeof(struct adlak_network_del_desc));
             if ((ERR(NONE) == ret) && (ERR(NONE) != cp_ret)) {
                 ret = cp_ret;
             }
 
             break;
+
         case ADLAK_IOCTL_INVOKE:
 
             AML_LOG_DEBUG("ADLAK_IOCTL_INVOKE");
@@ -284,6 +318,7 @@ static long drv_ioctl(struct file *filp, unsigned int ioctl_code, unsigned long 
             }
 
             break;
+
         case ADLAK_IOCTL_INVOKE_CANCEL:
 
             AML_LOG_DEBUG("ADLAK_IOCTL_INVOKE_CANCEL");
@@ -431,6 +466,128 @@ static long drv_ioctl(struct file *filp, unsigned int ioctl_code, unsigned long 
             }
 
             break;
+#ifdef CONFIG_ADLAK_TEE
+        case ADLAK_IOCTL_REGISTER_TEE_NETWORK:
+
+            AML_LOG_DEBUG("ADLAK_IOCTL_REGISTER_TEE_NETWORK");
+            ret = copy_from_user(&tee_net_reg_desc, udata, sizeof(struct adlak_tee_network_desc));
+            if (ret) {
+                AML_LOG_ERR("tee_net_reg_desc copy from user failed!");
+                ret = ERR(EFAULT);
+                break;
+            }
+            ret = adlak_os_mutex_lock(&padlak->dev_mutex);
+            if (ret) {
+                break;
+            }
+            ret = adlak_tee_net_register_request(context, &tee_net_reg_desc);
+
+            adlak_os_mutex_unlock(&padlak->dev_mutex);
+            /* copy buf info/errcode to user for reference */
+            cp_ret = copy_to_user(udata, &tee_net_reg_desc, sizeof(struct adlak_tee_network_desc));
+            if ((ERR(NONE) == ret) && (ERR(NONE) != cp_ret)) {
+                ret = cp_ret;
+            }
+
+            break;
+        case ADLAK_IOCTL_DESTROY_TEE_NETWORK:
+
+            AML_LOG_DEBUG("ADLAK_IOCTL_DESTROY_TEE_NETWORK");
+            ret = copy_from_user(&net_unreg_dec, udata, sizeof(struct adlak_network_del_desc));
+            if (ret) {
+                AML_LOG_ERR("net_unreg_dec copy from user failed!");
+                ret = ERR(EFAULT);
+                break;
+            }
+            ret = adlak_os_mutex_lock(&padlak->dev_mutex);
+            if (ret) {
+                break;
+            }
+            ret = adlak_tee_net_unregister_request(context, &net_unreg_dec);
+
+            adlak_os_mutex_unlock(&padlak->dev_mutex);
+            /* copy buf info/errcode to user for reference */
+            cp_ret = copy_to_user(udata, &net_unreg_dec, sizeof(struct adlak_network_del_desc));
+            if ((ERR(NONE) == ret) && (ERR(NONE) != cp_ret)) {
+                ret = cp_ret;
+            }
+
+            break;
+
+        case ADLAK_IOCTL_TEE_INVOKE:
+
+            AML_LOG_DEBUG("ADLAK_IOCTL_TEE_INVOKE");
+            ret = copy_from_user(&tee_invoke_desc, udata,
+                                 sizeof(struct adlak_tee_network_invoke_desc));
+            if (ret) {
+                AML_LOG_ERR("invoke desc copy from user failed!");
+                ret = ERR(EFAULT);
+                break;
+            }
+            ret = adlak_os_mutex_lock(&padlak->dev_mutex);
+            if (ret) {
+                break;
+            }
+            ret = adlak_tee_invoke_request(context, &tee_invoke_desc);
+
+            adlak_os_mutex_unlock(&padlak->dev_mutex);
+            /* copy buf info/errcode to user for reference */
+            cp_ret =
+                copy_to_user(udata, &tee_invoke_desc, sizeof(struct adlak_tee_network_invoke_desc));
+            if ((ERR(NONE) == ret) && (ERR(NONE) != cp_ret)) {
+                ret = cp_ret;
+            }
+
+            break;
+
+        case ADLAK_IOCTL_TEE_QUERY_ADDR:
+
+            AML_LOG_DEBUG("ADLAK_IOCTL_TEE_QUERY_ADDR");
+            ret = copy_from_user(&tee_query_addr, udata, sizeof(struct adlak_tee_query_addr));
+            if (ret) {
+                AML_LOG_ERR("tee_query_addr copy from user failed!");
+                ret = ERR(EFAULT);
+                break;
+            }
+            ret = adlak_os_mutex_lock(&padlak->dev_mutex);
+            if (ret) {
+                break;
+            }
+            ret = adlak_tee_query_addr(context, &tee_query_addr);
+
+            adlak_os_mutex_unlock(&padlak->dev_mutex);
+            /* copy buf info/errcode to user for reference */
+            cp_ret = copy_to_user(udata, &tee_query_addr, sizeof(struct adlak_tee_query_addr));
+            if ((ERR(NONE) == ret) && (ERR(NONE) != cp_ret)) {
+                ret = cp_ret;
+            }
+
+            break;
+
+        case ADLAK_IOCTL_TEE_PROTECT_ADDR:
+
+            AML_LOG_DEBUG("ADLAK_IOCTL_TEE_PROTECT_ADDR");
+            ret = copy_from_user(&tee_protect_addr, udata, sizeof(struct adlak_tee_protect_addr));
+            if (ret) {
+                AML_LOG_ERR("tee_query_addr copy from user failed!");
+                ret = ERR(EFAULT);
+                break;
+            }
+            ret = adlak_os_mutex_lock(&padlak->dev_mutex);
+            if (ret) {
+                break;
+            }
+            ret = adlak_tee_protect_addr(context, &tee_protect_addr);
+
+            adlak_os_mutex_unlock(&padlak->dev_mutex);
+            /* copy buf info/errcode to user for reference */
+            cp_ret = copy_to_user(udata, &tee_protect_addr, sizeof(struct adlak_tee_protect_addr));
+            if ((ERR(NONE) == ret) && (ERR(NONE) != cp_ret)) {
+                ret = cp_ret;
+            }
+
+            break;
+#endif
         default:
             /*not support command*/
             ret = ERR(ENOTTY);
@@ -460,18 +617,19 @@ static int drv_mmap(struct file *filp, struct vm_area_struct *vma) {
     return ret;
 }
 unsigned int drv_poll(struct file *filp, struct poll_table_struct *wait) {
-    unsigned int            mask      = 0;
-    struct adlak_context *  context   = filp->private_data;
-    struct adlak_device *   padlak    = context->padlak;
+    unsigned int            mask    = 0;
+    struct adlak_context *  context = filp->private_data;
+    struct adlak_device *   padlak;
     struct adlak_task *     ptask     = NULL;
     struct adlak_task *     ptask_tmp = NULL;
-    struct adlak_workqueue *pwq       = &padlak->queue;
+    struct adlak_workqueue *pwq;
 
     AML_LOG_DEBUG("%s", __func__);
-
     if (!context) {
         goto end;
     }
+    padlak = context->padlak;
+    pwq    = &padlak->queue;
     /*Add to wait queue*/
     poll_wait(filp, (wait_queue_head_t *)context->wait, wait);
     /*check whether the current net_id task is complete*/

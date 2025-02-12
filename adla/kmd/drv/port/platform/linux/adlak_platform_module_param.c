@@ -79,3 +79,6 @@ MODULE_PARM_DESC(share_buf_size, "share swap buffer size");
 module_param_named(smmu_iova_size, adlak_smmu_iova_size, uint, 0644);
 MODULE_PARM_DESC(smmu_iova_size,
                  "the iova size which supported by smmu,the unit is GByte,default value is 2");
+
+module_param_named(submit_blocking, adlak_submit_blocking, uint, 0644);
+MODULE_PARM_DESC(submit_blocking, "blocking when submit to hw");

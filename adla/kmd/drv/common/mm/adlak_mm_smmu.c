@@ -286,8 +286,8 @@ static int adlak_smmu_tlb_dump_inner(struct adlak_smmu_object *ptr_smmu) {
     tlb_logic = (uintptr_t)adlak_smmu_vmap(tlb->ptr_tlb_l1->mm_info);
     for (idx1 = 0; idx1 < tlb->iova_size_GB; idx1++) {
 #ifdef CONFIG_64BIT
-        adlak_os_printf("offset:0x%08X\t0x%llX \n", (uint32_t)(idx1 * sizeof(uint64_t)),
-                        _read_page_entry(tlb_logic + (idx1 * sizeof(uint64_t))));
+        adlak_os_printf("offset:0x%08X\t0x%lX \n", (uint32_t)(idx1 * sizeof(uint64_t)),
+                        (uintptr_t)_read_page_entry(tlb_logic + (idx1 * sizeof(uint64_t))));
 #else
         adlak_os_printf("offset:0x%08X\t0x%08X 0x%08X\n", (uint32_t)(idx1 * sizeof(uint64_t)),
                         _read_page_entry(tlb_logic + (idx1 * sizeof(uint32_t))),
@@ -303,12 +303,12 @@ static int adlak_smmu_tlb_dump_inner(struct adlak_smmu_object *ptr_smmu) {
         tlb_logic = (uintptr_t)adlak_smmu_vmap(tlb->ptr_tlb_l2[idx1].mm_info);
         for (idx2 = 0; idx2 < SMMU_TLB2_ENTRY_COUNT_2M;) {
 #ifdef CONFIG_64BIT
-            adlak_os_printf("offset:0x%08X\t0x%llX 0x%llX 0x%llX 0x%llX \n",
-                            (uint32_t)(idx2 * sizeof(uint64_t)),
-                            _read_page_entry(tlb_logic + (idx2 * sizeof(uint64_t))),
-                            _read_page_entry(tlb_logic + ((idx2 + 1) * sizeof(uint64_t))),
-                            _read_page_entry(tlb_logic + ((idx2 + 2) * sizeof(uint64_t))),
-                            _read_page_entry(tlb_logic + ((idx2 + 3) * sizeof(uint64_t))));
+            adlak_os_printf(
+                "offset:0x%08X\t0x%lX 0x%lX 0x%lX 0x%lX \n", (uint32_t)(idx2 * sizeof(uint64_t)),
+                (uintptr_t)_read_page_entry(tlb_logic + (idx2 * sizeof(uint64_t))),
+                (uintptr_t)_read_page_entry(tlb_logic + ((idx2 + 1) * sizeof(uint64_t))),
+                (uintptr_t)_read_page_entry(tlb_logic + ((idx2 + 2) * sizeof(uint64_t))),
+                (uintptr_t)_read_page_entry(tlb_logic + ((idx2 + 3) * sizeof(uint64_t))));
 #else
             adlak_os_printf(
                 "offset:0x%08X\t0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X\n",
@@ -343,12 +343,13 @@ static int adlak_smmu_tlb_dump_inner(struct adlak_smmu_object *ptr_smmu) {
                 tlb->ptr_tlb_l3[idx1 * SMMU_TLB2_ENTRY_COUNT_2M + idx2].mm_info);
             for (idx3 = 0; idx3 < SMMU_TLB2_ENTRY_COUNT_2M;) {
 #ifdef CONFIG_64BIT
-                adlak_os_printf("offset:0x%08X\t0x%llX 0x%llX 0x%llX 0x%llX \n",
-                                (uint32_t)(idx3 * sizeof(uint64_t)),
-                                _read_page_entry(tlb_logic + (idx3 * sizeof(uint64_t))),
-                                _read_page_entry(tlb_logic + ((idx3 + 1) * sizeof(uint64_t))),
-                                _read_page_entry(tlb_logic + ((idx3 + 2) * sizeof(uint64_t))),
-                                _read_page_entry(tlb_logic + ((idx3 + 3) * sizeof(uint64_t))));
+                adlak_os_printf(
+                    "offset:0x%08X\t0x%lX 0x%lX 0x%lX 0x%lX \n",
+                    (uint32_t)(idx3 * sizeof(uint64_t)),
+                    (uintptr_t)_read_page_entry(tlb_logic + (idx3 * sizeof(uint64_t))),
+                    (uintptr_t)_read_page_entry(tlb_logic + ((idx3 + 1) * sizeof(uint64_t))),
+                    (uintptr_t)_read_page_entry(tlb_logic + ((idx3 + 2) * sizeof(uint64_t))),
+                    (uintptr_t)_read_page_entry(tlb_logic + ((idx3 + 3) * sizeof(uint64_t))));
 #else
                 adlak_os_printf(
                     "offset:0x%08X\t0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X\n",
@@ -400,8 +401,8 @@ static int adlak_smmu_tlb_add(struct adlak_smmu_object *ptr_smmu, dma_addr_t iov
 #endif
 #if ADLAK_DEBUG_SMMU_EN
 
-    AML_LOG_DEBUG("iova_addr = 0x%llx, phys_addr = 0x%llx ", (uint64_t)iova_addr,
-                  (uint64_t)phys_addr);
+    AML_LOG_DEBUG("iova_addr = 0x%lx, phys_addr = 0x%lx ", (uintptr_t)iova_addr,
+                  (uintptr_t)phys_addr);
 #endif
     tlb_l1_offset = GET_SMMU_TLB1_ENTRY_OFFSEST(iova_addr);
     tlb_l2_offset = GET_SMMU_TLB2_ENTRY_OFFSEST(iova_addr);
@@ -417,12 +418,11 @@ static int adlak_smmu_tlb_add(struct adlak_smmu_object *ptr_smmu, dma_addr_t iov
     entry_val = entry_val | SMMU_ENTRY_FLAG_L3_VALID;
 #if ADLAK_DEBUG_SMMU_EN
 #ifdef CONFIG_64BIT
-    AML_LOG_DEBUG("tlb_logic = 0x%llx+0x%x, entry_val = 0x%llx ", (uint64_t)tlb_logic,
-                  (tlb_l3_offset * SMMU_TLB_ENTRY_SIZE), (uint64_t)entry_val);
+    AML_LOG_DEBUG("tlb_logic = 0x%lx+0x%x, entry_val = 0x%lx ", (uintptr_t)tlb_logic,
+                  (tlb_l3_offset * SMMU_TLB_ENTRY_SIZE), (uintptr_t)entry_val);
 #else
-    AML_LOG_DEBUG("tlb_logic = 0x%llx+0x%x, entry_val = 0x%llx ",
-                  (uint64_t)(tlb_logic & 0xFFFFFFFF), (tlb_l3_offset * SMMU_TLB_ENTRY_SIZE),
-                  (uint64_t)entry_val);
+    AML_LOG_DEBUG("tlb_logic = 0x%lx+0x%x, entry_val = 0x%lx ", (uintptr_t)(tlb_logic & 0xFFFFFFFF),
+                  (tlb_l3_offset * SMMU_TLB_ENTRY_SIZE), (uintptr_t)entry_val);
 #endif
 #endif
 
@@ -444,7 +444,7 @@ static int adlak_smmu_tlb_del(struct adlak_smmu_object *ptr_smmu, dma_addr_t iov
 
 #if ADLAK_DEBUG_SMMU_EN
     AML_LOG_DEBUG("%s", __func__);
-    AML_LOG_DEBUG("tlb_del iova_addr = 0x%llx ", (uint64_t)iova_addr);
+    AML_LOG_DEBUG("tlb_del iova_addr = 0x%lx ", (uintptr_t)iova_addr);
 #endif
     tlb_l1_offset = GET_SMMU_TLB1_ENTRY_OFFSEST(iova_addr);
     tlb_l2_offset = GET_SMMU_TLB2_ENTRY_OFFSEST(iova_addr);
@@ -597,8 +597,8 @@ static int adlak_smmu_iova_map(struct adlak_smmu_object *smmu, struct adlak_mem_
 
     iova_addr = mm_info->iova_addr;
 
-    AML_LOG_DEBUG("iova_addr = 0x%llx, phys_addr[0] = 0x%llx ", (uint64_t)mm_info->iova_addr,
-                  (uint64_t)mm_info->phys_addrs[0]);
+    AML_LOG_DEBUG("iova_addr = 0x%lx, phys_addr[0] = 0x%lx ", (uintptr_t)mm_info->iova_addr,
+                  (uintptr_t)mm_info->phys_addrs[0]);
 
     for (i = 0; i < mm_info->nr_pages; ++i) {
         for (j = 0; j < ADLAK_PAGE_SIZE / SMMU_PAGESIZE; ++j) {
@@ -612,7 +612,12 @@ static int adlak_smmu_iova_map(struct adlak_smmu_object *smmu, struct adlak_mem_
             if (mm_info->req.bytes < (1 << SMMU_TLB2_VA_SHIFT)) {
                 //   adlak_hal_smmu_cache_invalid((void *)mm->padlak, iova_addr);
             }
-            iova_addr += SMMU_PAGESIZE;
+            if (likely(iova_addr <= ULONG_MAX - SMMU_PAGESIZE)) {
+                iova_addr += SMMU_PAGESIZE;
+            } else {
+                AML_LOG_ERR("The iova 0x%lX is invalid\n", (uintptr_t)iova_addr);
+                goto unmap_pages;
+            }
         }
     }
     if (mm_info->req.bytes >= (1 << SMMU_TLB2_VA_SHIFT)) {
@@ -924,7 +929,7 @@ static struct adlak_mem_handle *adlak_smmu_attach(struct adlak_context_smmu_attr
     if (!ret) {
         pbuf_req->errcode = 0;
     } else {
-        pbuf_req->errcode = ret;
+        pbuf_req->errcode = (int32_t)ret;
         adlak_mem_uid_free(mm_info->uid);
         adlak_os_free(mm_info);
         mm_info = (void *)NULL;
@@ -990,12 +995,10 @@ static int adlak_smmu_create_obj(struct adlak_smmu_object **pptr_smmu, uint32_t 
 
     ptr_smmu->iova_byte = ((size_t)iova_max_size_GB) << 30;
 
-#ifndef CONFIG_64BIT
     if (3 < iova_max_size_GB && 0 == ptr_smmu->iova_byte) {
         // Data overflow may occur in 32bit systems
         ptr_smmu->iova_byte = 0xFFFFFFFF - ((sizeof(long) * 8 << ADLAK_MM_POOL_PAGE_SHIFT) - 1);
     }
-#endif
 
     ptr_smmu->tlb.iova_size_GB = iova_max_size_GB;
     ret                        = adlak_bitmap_pool_init(&ptr_smmu->bitmap_area, ptr_smmu->iova_byte,

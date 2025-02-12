@@ -86,6 +86,7 @@ struct adlak_hw_stat {
     uint32_t                regs_stat[REG_ADLAK_NUM_MAX];
     struct adlak_irq_status irq_status;
     struct adlak_hw_info *  hw_info;
+    uint32_t                extra_status;
 };
 
 /************************** Function Prototypes ******************************/

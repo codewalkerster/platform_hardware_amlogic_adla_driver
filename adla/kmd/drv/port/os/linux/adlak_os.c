@@ -208,7 +208,7 @@ int adlak_os_mutex_init(adlak_os_mutex_t *mutex) {
     PRINT_FUNC_NAME;
     pmutex_inner =
         (adlak_os_mutex_inner_t *)adlak_os_malloc(sizeof(adlak_os_mutex_inner_t), ADLAK_GFP_KERNEL);
-    if (ADLAK_IS_ERR_OR_NULL(pmutex_inner)) {
+    if (pmutex_inner == NULL) {
         *mutex = NULL;
         return ERR(ENOMEM);
     }
@@ -264,7 +264,7 @@ int adlak_os_spinlock_init(adlak_os_spinlock_t *spinlock) {
     PRINT_FUNC_NAME;
     pspinlock_inner = (adlak_os_spinlock_inner_t *)adlak_os_malloc(
         sizeof(adlak_os_spinlock_inner_t), ADLAK_GFP_KERNEL);
-    if (ADLAK_IS_ERR_OR_NULL(pspinlock_inner)) {
+    if (pspinlock_inner == NULL) {
         *spinlock = NULL;
         return ERR(ENOMEM);
     }
@@ -316,7 +316,7 @@ int adlak_os_sema_init(adlak_os_sema_t *sem, unsigned int max_count, unsigned in
     PRINT_FUNC_NAME;
     psema_inner =
         (adlak_os_sema_inner_t *)adlak_os_malloc(sizeof(adlak_os_sema_inner_t), ADLAK_GFP_KERNEL);
-    if (ADLAK_IS_ERR_OR_NULL(psema_inner)) {
+    if (psema_inner == NULL) {
         *sem = NULL;
         return ERR(ENOMEM);
     }
@@ -420,8 +420,8 @@ static void signaler_set_rtpriority(adlak_os_thread_t *pthrd) {
 #endif
 
 int adlak_kthread_cpuid = -1;
-module_param_named(kthread_cpuid, adlak_kthread_cpuid, int, 0644);
-MODULE_PARM_DESC(kthread_cpuid, "bind adlak_kthread the a \"housekeeping\" CPU");
+//module_param_named(kthread_cpuid, adlak_kthread_cpuid, int, 0644);
+//MODULE_PARM_DESC(kthread_cpuid, "bind adlak_kthread the a \"housekeeping\" CPU");
 
 int adlak_os_thread_create(adlak_os_thread_t *pthrd, adlak_thread_cb_func_t func, void *arg) {
     static uint32_t          thread_num    = 0;
@@ -430,7 +430,7 @@ int adlak_os_thread_create(adlak_os_thread_t *pthrd, adlak_thread_cb_func_t func
     PRINT_FUNC_NAME;
     pthread_inner = (adlak_os_thread_inner_t *)adlak_os_malloc(sizeof(adlak_os_thread_inner_t),
                                                                ADLAK_GFP_KERNEL);
-    if (ADLAK_IS_ERR_OR_NULL(pthread_inner)) {
+    if (pthread_inner == NULL) {
         AML_LOG_ERR("malloc for thread_internal_t fail!\n");
         return ERR(ENOMEM);
     }
@@ -438,7 +438,7 @@ int adlak_os_thread_create(adlak_os_thread_t *pthrd, adlak_thread_cb_func_t func
     pthread_inner->kthread  = kthread_create(func, (void *)arg, "adlak_kthread_%d", thread_num);
     if (ADLAK_IS_ERR_OR_NULL(pthread_inner->kthread)) {
         adlak_os_free(pthread_inner);
-        pthrd->handle = (void *)pthread_inner;
+        pthrd->handle = (void *)NULL;
         AML_LOG_DEBUG("thread create fail!\n");
         return ERR(ENXIO);
     } else {
@@ -504,7 +504,7 @@ int adlak_os_timer_init(adlak_os_timer_t *ptim, adlak_timer_cb_func_t func, void
     PRINT_FUNC_NAME;
     ptimer_inner =
         (adlak_os_timer_inner_t *)adlak_os_malloc(sizeof(adlak_os_timer_inner_t), ADLAK_GFP_KERNEL);
-    if (ADLAK_IS_ERR_OR_NULL(ptimer_inner)) {
+    if (ptimer_inner == NULL) {
         return ERR(ENOMEM);
     }
     timer_setup(&ptimer_inner->timer, func, 0);
@@ -569,7 +569,7 @@ int adlak_to_umd_sinal_init(uintptr_t *hd) {
     wait_queue_head_t *wait_inner = NULL;
     PRINT_FUNC_NAME;
     wait_inner = (wait_queue_head_t *)adlak_os_malloc(sizeof(wait_queue_head_t), ADLAK_GFP_KERNEL);
-    if (ADLAK_IS_ERR_OR_NULL(wait_inner)) {
+    if (wait_inner == NULL) {
         return ERR(ENOMEM);
     }
 

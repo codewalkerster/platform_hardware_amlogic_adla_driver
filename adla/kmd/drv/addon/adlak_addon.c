@@ -23,7 +23,7 @@
 #include "adlak_device.h"
 #include "adlak_mm.h"
 #include "adlak_submit.h"
-#include "adlak_feature_addon.c"
+#include "adlak_feature_addon.h"
 int *adlak_dev_state;
 
 int adlak_get_hw_info (struct adlak_device *padlak, char *buf, size_t size)

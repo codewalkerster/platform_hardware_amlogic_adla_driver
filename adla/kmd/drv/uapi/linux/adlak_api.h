@@ -65,8 +65,16 @@ extern "C" {
 #define ADLAK_IOCTL_PROFILE_CFG _IOWR(ADLAK_IOCTL_MAGIC, 14, struct adlak_profile_cfg_desc)
 #define ADLAK_IOCTL_WAIT_UNTIL_FINISH _IOWR(ADLAK_IOCTL_MAGIC, 15, struct adlak_get_stat_desc)
 
+#define ADLAK_IOCTL_REGISTER_NETWORKS _IOWR(ADLAK_IOCTL_MAGIC, 16, struct adlak_networks_desc)
+
 #define ADLAK_IOCTL_SET_CONTEXT_ATTRIBUTE \
     _IOWR(ADLAK_IOCTL_MAGIC, 16, struct adlak_context_attribute)
+
+#define ADLAK_IOCTL_REGISTER_TEE_NETWORK _IOWR(ADLAK_IOCTL_MAGIC, 17, struct adlak_tee_network_desc)
+#define ADLAK_IOCTL_DESTROY_TEE_NETWORK _IOWR(ADLAK_IOCTL_MAGIC, 18, struct adlak_network_del_desc)
+#define ADLAK_IOCTL_TEE_INVOKE _IOWR(ADLAK_IOCTL_MAGIC, 19, struct adlak_tee_network_invoke_desc)
+#define ADLAK_IOCTL_TEE_QUERY_ADDR _IOWR(ADLAK_IOCTL_MAGIC, 20, struct adlak_tee_query_addr)
+#define ADLAK_IOCTL_TEE_PROTECT_ADDR _IOWR(ADLAK_IOCTL_MAGIC, 21, struct adlak_tee_protect_addr)
 
 #define ADLAK_IOCTL_SET_INFO _IOWR(ADLAK_IOCTL_MAGIC, 50, struct adlak_dev_info_set_req)
 #define ADLAK_IOCTL_GET_INFO _IOWR(ADLAK_IOCTL_MAGIC, 51, struct adlak_dev_info_get_req)

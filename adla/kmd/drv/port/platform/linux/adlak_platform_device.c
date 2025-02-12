@@ -69,7 +69,7 @@ MODULE_DEVICE_TABLE(of, adlak_child_pdev_match);
  *
  ******************************************************************************/
 
-#include "adlak_fops.c"
+#include "adlak_fops.h"
 static int adlak_destroy_cdev(struct adlak_device *padlak) {
     if (!padlak) {
         return ERR(ENOMEM);
@@ -229,7 +229,7 @@ static int adlak_platform_probe(struct platform_device *pdev) {
         AML_LOG_WARN("set device dma mask failed,No suitable DMA available!");
     }
 
-    ret               = adlak_platform_get_resource(padlak);
+    ret = adlak_platform_get_resource(padlak);
     if (ret) {
         goto err_get_res;
     }
@@ -440,7 +440,12 @@ static void __exit adlak_module_exit(void) {
 #endif
     adlak_class_release();
 }
-module_init(adlak_module_init) module_exit(adlak_module_exit) MODULE_LICENSE("GPL");
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+MODULE_IMPORT_NS(DMA_BUF);
+#endif
+module_init(adlak_module_init);
+module_exit(adlak_module_exit);
+MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Amlogic ADLA GROUP");
 MODULE_DESCRIPTION("Amlogic Deep Learn Accelarator Driver");
 MODULE_VERSION(ADLAK_VERSION);

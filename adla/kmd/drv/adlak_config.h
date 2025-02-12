@@ -80,7 +80,12 @@ extern "C" {
 #define CONFIG_ADLAK_DPM_EN (1)
 #endif
 
+#ifndef CONFIG_ADLAK_TEE
+#define CONFIG_ADLAK_TEE (1)
+#endif
+
 #define ADLAK_MAX_NET_IDS 1024  // maximum of 1024 contexts can exist simultaneously
+#define CONFIG_ADLAK_FIXUP_TIMESTAMP_ENABLE 1
 
 /************************** Function Prototypes ******************************/
 

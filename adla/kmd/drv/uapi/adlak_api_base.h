@@ -22,6 +22,7 @@
 #define __ADLAK_API_BASE_H__
 
 /***************************** Include Files *********************************/
+#include "adlak_errcode.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,6 +33,15 @@ extern "C" {
 /**************************Global Variable************************************/
 
 /**************************Type Definition and Structure**********************/
+enum adlak_extra_state {
+    ADLAK_EXTRA_STATE_PM_FIFO_OVERFLOW    = (1 << 0),
+    ADLAK_EXTRA_STATE_PM_ARBITER_OVERFLOW = (1 << 1),
+} __packed;
+
+enum adlak_pm_buffer_size_perlayer {
+    ADLAK_PM_BUFFER_SIZE_PERLAYER_V1 = (256),
+    ADLAK_PM_BUFFER_SIZE_PERLAYER_V2 = (512),
+} __packed;
 
 enum adlak_smmu_tlb_type {
     ADLAK_ENUM_SMMU_TLB_TYPE_PUBLIC_ONLY = 0,  // default setting
@@ -73,7 +83,7 @@ struct adlak_buf_req {
     uint32_t              mem_direction; /*request info*/
     struct adlak_buf_desc ret_desc;      /* info of buffer successfully allocated */
     uint32_t              mmap_en;       /* the flag of mmap */
-    uint32_t              errcode;       /* return err number */
+    int32_t               errcode;       /* return err number */
 } __packed;
 
 struct adlak_extern_buf_info {
@@ -85,7 +95,7 @@ struct adlak_extern_buf_info {
     uint32_t              mem_direction; /*request info*/
     struct adlak_buf_desc ret_desc;      /* info of buffer successfully import */
     uint32_t              mmap_en;       /* the flag of mmap */
-    uint32_t              errcode;       /* return err number */
+    int32_t               errcode;       /* return err number */
 } __packed;
 
 enum adlak_flush_cache_direction {
@@ -100,7 +110,7 @@ struct adlak_buf_flush {
     uint32_t is_partial; /* is dma sync partial*/
     uint64_t offset;
     uint64_t size;
-    uint32_t errcode; /* return err number */
+    int32_t  errcode; /* return err number */
 } __packed;
 
 struct adlak_cmd_buf_attr {
@@ -144,17 +154,26 @@ struct adlak_network_desc {
 
 } __packed;
 
+struct adlak_networks_desc {
+    uint32_t sub_tasks_count;
+    uint64_t networks_desc_va;
+    int32_t  net_register_idx;  // return from kmd
+} __packed;
+
 struct adlak_network_del_desc {
     int32_t net_register_idx;
 } __packed;
 
 struct adlak_network_invoke_desc {
     int32_t  net_register_idx;
+    uint32_t sub_tasks_idx;
     int32_t  invoke_register_idx;  // return from kmd
     int32_t  start_idx;
     int32_t  end_idx;
     int32_t  addr_fixups_num;
     uint64_t addr_fixups_va;
+    int32_t  reg_fixups_num_for_input;
+    uint64_t reg_fixups_va_for_input;
 
 } __packed;
 
@@ -182,14 +201,16 @@ struct adlak_get_stat_desc {
     int64_t  mem_pool_size;     //-1:the limit base on the system
     uint64_t mem_pool_used;     // memory usage
     int32_t  efficiency;
+    uint32_t exrta_status;
 } __packed;
 
 struct adlak_profile_cfg_desc {
     int32_t  net_register_idx;
+    uint32_t sub_tasks_idx;
     int32_t  profile_en;  // profilling enable
     uint64_t profile_iova;
     uint32_t profile_buf_size;
-    uint32_t errcode; /* return err number */
+    int32_t  errcode; /* return err number */
 
 } __packed;
 
@@ -212,6 +233,33 @@ struct adlak_caps_desc {
 struct adlak_context_attribute {
     uint32_t smmu_tlb_type : 8;
     uint32_t rsv : 24;
+} __packed;
+
+struct adlak_tee_network_desc {
+    uint32_t priority;          // submit priority
+    int32_t  net_register_idx;  // return from kmd
+    uint64_t tee_ctx_handle;
+} __packed;
+
+struct adlak_tee_network_invoke_desc {
+    int32_t net_register_idx;
+    int32_t invoke_register_idx;  // return from kmd
+    int32_t invoke_section_id;
+
+} __packed;
+
+struct adlak_tee_query_addr {
+    int32_t  net_register_idx;
+    uint64_t fd;
+    uint64_t ret_addr;
+    uint64_t ret_size;
+
+} __packed;
+
+struct adlak_tee_protect_addr {
+    int32_t  net_register_idx;
+    uint64_t phys_addr;
+    uint64_t size;
 } __packed;
 
 struct adlak_dev_info_get_req {

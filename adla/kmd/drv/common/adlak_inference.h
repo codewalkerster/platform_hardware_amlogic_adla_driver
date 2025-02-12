@@ -20,6 +20,7 @@
 
 /***************************** Include Files *********************************/
 #include "adlak_dpm.h"
+#include "adlak_mm_common.h"
 
 /************************** Constant Definitions *****************************/
 
@@ -60,21 +61,22 @@ static void adlak_irq_bottom_half(struct adlak_device *padlak, int *device_state
                                   struct adlak_task *ptask);
 
 int adlak_submit_wait(struct adlak_dev_inference *pinference, struct adlak_task *ptask) {
-    int                  ret;
-    int                  repeat = 0;
-    uint32_t             timeout;
-    struct adlak_device *padlak = ptask->context->padlak;
+    int                      ret;
+    int                      repeat = 0;
+    uint32_t                 timeout;
+    struct adlak_device *    padlak      = ptask->context->padlak;
+    struct adlak_model_attr *pmodel_attr = NULL;
     AML_LOG_INFO("%s", __func__);
 #if defined(CONFIG_ADLAK_EMU_EN) && (CONFIG_ADLAK_EMU_EN == 1)
     /* Suppose ptask->sw_timeout_ms_ms is greater than 5 */
     adlak_os_timer_add(&pinference->emu_timer, 5);
 #endif
 
-    AML_LOG_INFO("set submit hw_timeout_ms=%u ms", ptask->context->pmodel_attr->hw_timeout_ms);
-    if (ptask->context->pmodel_attr->hw_timeout_ms) {
+    pmodel_attr = adlak_get_model_attr(ptask->context, ptask->sub_tasks_idx);
+    AML_LOG_INFO("set submit hw_timeout_ms=%u ms", pmodel_attr->hw_timeout_ms);
+    if (pmodel_attr->hw_timeout_ms) {
         do {
-            ret = adlak_os_sema_take_timeout(pinference->sem_irq,
-                                             ptask->context->pmodel_attr->hw_timeout_ms);
+            ret = adlak_os_sema_take_timeout(pinference->sem_irq, pmodel_attr->hw_timeout_ms);
             if (ERR(NONE) == ret) {
                 AML_LOG_INFO("%s\n", "sema_take success");
                 timeout = false;
@@ -212,14 +214,15 @@ static int adlak_dev_inference_cb(void *args) {
 static void *adlak_dev_inference_cb(void *args) {
 #endif
 
-    int                     ret;
-    struct adlak_device *   padlak        = args;
-    struct adlak_workqueue *pwq           = &padlak->queue;
-    adlak_os_thread_t *     pthrd         = &pwq->dev_inference.thrd_inference;
-    struct adlak_task *     ptask_sch_cur = NULL, *ptask_sch_pre = NULL;
-    int32_t                 net_id_invoke_previous = -1;
-    int                     inference_state        = ADLAK_INFERENCE_STATE_INIT;
-    int                     device_state, dpm_stategy, valid_num, pending_num;
+    int                      ret;
+    struct adlak_device *    padlak        = args;
+    struct adlak_workqueue * pwq           = &padlak->queue;
+    adlak_os_thread_t *      pthrd         = &pwq->dev_inference.thrd_inference;
+    struct adlak_task *      ptask_sch_cur = NULL, *ptask_sch_pre = NULL;
+    int32_t                  net_id_invoke_previous = -1;
+    int                      inference_state        = ADLAK_INFERENCE_STATE_INIT;
+    int                      device_state, dpm_stategy, valid_num, pending_num = 0;
+    struct adlak_model_attr *pmodel_attr = NULL;
 
 #ifdef CONFIG_PM
     int pm_suspend;
@@ -372,21 +375,51 @@ static void *adlak_dev_inference_cb(void *args) {
 
                 pwq->ptask_sch_cur = ptask_sch_cur;
                 pwq->submit_num++;
-                if (0 == ptask_sch_cur->context->pmodel_attr->hw_parser_v2_support) {
-                    (void)adlak_submit_patch_and_exec(ptask_sch_cur);
-                } else {
-                    (void)adlak_submit_patch_and_exec_v2(ptask_sch_cur);
-                }
-                net_id_invoke_previous = -1;
-                if (padlak->share_swap_en) {
-                    if (ptask_sch_cur->invoke_end_idx <
-                        ptask_sch_cur->context->pmodel_attr->hw_layer_last) {
-                        net_id_invoke_previous = ptask_sch_cur->context->net_id;
+
+#ifdef CONFIG_ADLAK_TEE
+                if (NULL != ptask_sch_cur->context->ptee_model_attr) {
+                    if (ptask_sch_pre) {
+                        adlak_os_mutex_lock(&pwq->wq_mutex);
+                        ret = adlak_queue_update_task_state(padlak,
+                                                            (struct adlak_task *)ptask_sch_pre);
+                        adlak_os_mutex_unlock(&pwq->wq_mutex);
+                        if (1 == ret) {
+                            adlak_to_umd_sinal_give(
+                                ptask_sch_pre->context->wait); /*give signal to umd*/
+                        }
+                        // report state
+                        ptask_sch_pre = NULL;
+                    }
+                    (void)adlak_submit_tee_task(ptask_sch_cur, ADLAK_INVALID_ADDR);
+                    net_id_invoke_previous = -1;
+
+                    inference_state = ADLAK_INFERENCE_STATE_CHECK_TASK;
+                } else
+#endif
+                {
+
+                    pmodel_attr =
+                        adlak_get_model_attr(ptask_sch_cur->context, ptask_sch_cur->sub_tasks_idx);
+                    if (0 == pmodel_attr->hw_parser_v2_support) {
+                        (void)adlak_submit_patch_and_exec(ptask_sch_cur);
+                    } else {
+                        (void)adlak_submit_patch_and_exec_v2(ptask_sch_cur);
+                    }
+                    if (!ptask_sch_cur->blocking) {
+                        net_id_invoke_previous = -1;
+                        if (padlak->share_swap_en) {
+                            if (ptask_sch_cur->invoke_end_idx < pmodel_attr->hw_layer_last) {
+                                net_id_invoke_previous = ptask_sch_cur->context->net_id;
+                            }
+                        }
+                        device_state    = ADLAK_DEVICE_BUSY;
+                        inference_state = ADLAK_INFERENCE_STATE_REPORT_TASK_PRE;
+                    } else {
+                        net_id_invoke_previous = -1;
+                        ptask_sch_cur->state   = ADLAK_SUBMIT_STATE_FINISHED;
+                        inference_state        = ADLAK_INFERENCE_STATE_CHECK_TASK;
                     }
                 }
-
-                device_state    = ADLAK_DEVICE_BUSY;
-                inference_state = ADLAK_INFERENCE_STATE_REPORT_TASK_PRE;
                 break;
             case ADLAK_INFERENCE_STATE_REPORT_TASK_PRE:
             case ADLAK_INFERENCE_STATE_REPORT_TASK_PRE2:
@@ -410,6 +443,9 @@ static void *adlak_dev_inference_cb(void *args) {
 
             case ADLAK_INFERENCE_STATE_SUBMIT_WAIT:
                 // wait until finished
+                if (unlikely(!ptask_sch_cur)) {
+                    break;
+                }
                 if (ERR(NONE) != adlak_submit_wait(&pwq->dev_inference, ptask_sch_cur)) {
                     AML_LOG_ERR("%s\n", "submit timeout");
                     ptask_sch_cur->hw_stat.irq_status.timeout = true;
@@ -426,6 +462,9 @@ static void *adlak_dev_inference_cb(void *args) {
                 inference_state = ADLAK_INFERENCE_STATE_CHECK_TASK;
                 break;
             case ADLAK_INFERENCE_STATE_CHECK_TASK:
+                if (unlikely(!ptask_sch_cur)) {
+                    break;
+                }
                 if (ptask_sch_cur->state == ADLAK_SUBMIT_STATE_FINISHED) {
                     // store task
                     ptask_sch_pre      = ptask_sch_cur;
@@ -440,6 +479,9 @@ static void *adlak_dev_inference_cb(void *args) {
                 }
                 break;
             case ADLAK_INFERENCE_STATE_REPORT_TASK_CUR:
+                if (unlikely(!ptask_sch_cur)) {
+                    break;
+                }
                 ASSERT(NULL != ptask_sch_cur);
                 adlak_os_mutex_lock(&pwq->wq_mutex);
                 AML_LOG_INFO("adlak_queue_update_task_state cur %d !\n", __LINE__);
@@ -475,9 +517,10 @@ static void *adlak_dev_inference_cb(void *args) {
 #if defined(CONFIG_ADLAK_EMU_EN) && (CONFIG_ADLAK_EMU_EN == 1)
 
 static void adlak_emu_irq_cb(adlak_os_timer_cb_t t) {
-    struct adlak_hw_stat *      phw_stat   = NULL;
-    struct adlak_dev_inference *pinference = NULL;
-    struct adlak_task *         ptask      = NULL;
+    struct adlak_hw_stat *      phw_stat    = NULL;
+    struct adlak_dev_inference *pinference  = NULL;
+    struct adlak_task *         ptask       = NULL;
+    struct adlak_model_attr *   pmodel_attr = NULL;
     AML_LOG_DEBUG("%s\n", __func__);
     adlak_cant_sleep();
     pinference                      = &g_adlak_pwq->dev_inference;
@@ -488,7 +531,8 @@ static void adlak_emu_irq_cb(adlak_os_timer_cb_t t) {
     phw_stat->irq_status.time_stamp = ptask->time_stamp;
     phw_stat->ps_rbf_rpt            = adlak_emu_update_rpt();
 
-    ptask->context->pmodel_attr->cmq_buffer->cmq_rd_offset = phw_stat->ps_rbf_rpt;
+    pmodel_attr = adlak_get_model_attr(ptask->context, ptask->sub_tasks_idx);
+    pmodel_attr->cmq_buffer->cmq_rd_offset = phw_stat->ps_rbf_rpt;
     adlak_os_sema_give_from_isr(pinference->sem_irq);
 }
 #endif
@@ -559,12 +603,12 @@ int adlak_dev_inference_deinit(struct adlak_device *padlak) {
         adlak_os_timer_destroy(&pinference->emu_timer);
     }
     if (pinference->sem_irq) {
-        ret = adlak_os_sema_destroy(&pinference->sem_irq);
+        adlak_os_sema_destroy(&pinference->sem_irq);
     }
     if (pinference->spinlock) {
-        ret = adlak_os_spinlock_destroy(&pinference->spinlock);
+        adlak_os_spinlock_destroy(&pinference->spinlock);
     }
-    ret = adlak_os_mutex_unlock(&pwq->wq_mutex);
+    adlak_os_mutex_unlock(&pwq->wq_mutex);
 err:
     return 0;
 }
@@ -579,7 +623,7 @@ static void adlak_irq_status_decode(uint32_t state) {
     if (state & ADLAK_IRQ_MASK_PARSER_STOP_PMT) {
         AML_LOG_WARN(" [2]: parser stop for preempt");
     }
-    if (state & ADLAK_IRQ_MASK_PEND_TIMOUT) {
+    if (state & ADLAK_IRQ_MASK_PEND_TIMEOUT) {
         AML_LOG_WARN(" [3]: pending timer timeout");
     }
     if (state & ADLAK_IRQ_MASK_LAYER_END) {
@@ -588,7 +632,7 @@ static void adlak_irq_status_decode(uint32_t state) {
     if (state & ADLAK_IRQ_MASK_TIM_STAMP) {
         AML_LOG_WARN(" [5]: time_stamp irq event");
     }
-    if (state & ADLAK_IRQ_MASK_APB_WAIT_TIMOUT) {
+    if (state & ADLAK_IRQ_MASK_APB_WAIT_TIMEOUT) {
         AML_LOG_WARN(" [6]: apb wait timer timeout");
     }
     if (state & ADLAK_IRQ_MASK_PM_DRAM_OVF) {
@@ -655,17 +699,19 @@ static void adlak_status_report_decode(uint32_t state) {
 
 static void adlak_irq_bottom_half(struct adlak_device *padlak, int *device_state,
                                   struct adlak_task *ptask) {
-    struct adlak_hw_info *phw_info = NULL;
-    struct adlak_hw_stat *phw_stat = NULL;
+    struct adlak_hw_info *   phw_info    = NULL;
+    struct adlak_hw_stat *   phw_stat    = NULL;
+    struct adlak_model_attr *pmodel_attr = NULL;
     AML_LOG_INFO("%s", __func__);
 
     adlak_os_mutex_lock(&padlak->dev_mutex);
 
-    phw_stat = &ptask->hw_stat;
-    adlak_profile_stop(
-        padlak, ptask->context, &ptask->context->pmodel_attr->pm_cfg, &ptask->context->pmodel_attr->pm_stat,
-        &ptask->profilling,
-        (ptask->invoke_end_idx >= ptask->context->pmodel_attr->hw_layer_last) ? 1 : 0);
+    pmodel_attr = adlak_get_model_attr(ptask->context, ptask->sub_tasks_idx);
+    phw_stat    = &ptask->hw_stat;
+    adlak_profile_stop(padlak, ptask->context, &pmodel_attr->pm_cfg, &pmodel_attr->pm_stat, &ptask->profilling,
+                       ptask->invoke_end_idx);
+                       // (ptask->invoke_end_idx >= &pmodel_attr->hw_layer_last) ? 1 : 0);   // driver 1.4
+
 
     phw_info = phw_stat->hw_info;
 
@@ -673,7 +719,8 @@ static void adlak_irq_bottom_half(struct adlak_device *padlak, int *device_state
     if (phw_info->irq_cfg.mask_normal & phw_stat->irq_status.irq_masked) {
         *device_state = ADLAK_DEVICE_IDLE;
         if (ptask->time_stamp == phw_stat->irq_status.time_stamp) {
-            ptask->state = ADLAK_SUBMIT_STATE_FINISHED;
+            ptask->state      = ADLAK_SUBMIT_STATE_FINISHED;
+            ptask->error_code = ADLAK_SUCCESS;
             AML_LOG_INFO("submit_finished,IRQ status[0x%08X].", phw_stat->irq_status.irq_masked);
         } else {
             *device_state = ADLAK_DEVICE_ERR;
@@ -689,6 +736,11 @@ static void adlak_irq_bottom_half(struct adlak_device *padlak, int *device_state
         AML_LOG_ERR("IRQ status[0x%08X].", phw_stat->irq_status.irq_masked);
         adlak_irq_status_decode(phw_stat->irq_status.irq_masked);
         adlak_status_report_decode(phw_stat->irq_status.status_report);
+        if (phw_stat->irq_status.irq_masked & ADLAK_IRQ_MASK_SW_TIMEOUT) {
+            ptask->error_code = ADLAK_SOFTWARE_TIMEOUT;
+        } else {
+            ptask->error_code = ADLAK_HARDWARE_TIMEOUT;
+        }
     } else {
         *device_state = ADLAK_DEVICE_ERR;
         if (CONTEXT_STATE_CLOSED != ptask->context->state) {

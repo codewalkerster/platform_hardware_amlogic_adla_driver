@@ -40,7 +40,7 @@
 
 /*****************************************************************************/
 
-#include "adlak_inference.c"
+#include "adlak_inference.h"
 
 int adlak_queue_init(struct adlak_device *padlak) {
     struct adlak_workqueue *pwq = &padlak->queue;

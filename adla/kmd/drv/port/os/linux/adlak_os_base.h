@@ -26,7 +26,9 @@
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/device.h>
+#include <linux/dma-buf.h>
 #include <linux/dma-direct.h>
+#include <linux/dma-heap.h>
 #include <linux/dma-mapping.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>

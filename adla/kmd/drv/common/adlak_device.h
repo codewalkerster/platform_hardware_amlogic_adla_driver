@@ -27,6 +27,9 @@
 #include "adlak_platform_device.h"
 #include "adlak_queue.h"
 
+#ifdef CONFIG_ADLAK_TEE
+#include "adlak_tee.h"
+#endif
 #ifdef CONFIG_ADLAK_DEBUG_INNNER
 #include "adlak_dbg.h"
 #endif
@@ -138,6 +141,7 @@ struct adlak_device {
     bool         share_swap_en; /*Share swap memory between diffrent models*/
     unsigned int share_buf_size;
     unsigned int iova_max_size_GB;  // unit is Gbyte
+    unsigned int submit_blocking;   // for debug blocking
 
     /* sh nn team */
     struct clk *            clk; /* clk_core's parent */

@@ -33,7 +33,6 @@
 #ifndef ADLAK_DEBUG_CMQ_PATTTCHING_EN
 #define ADLAK_DEBUG_CMQ_PATTTCHING_EN (0)
 #endif
-
 /**************************** Type Definitions *******************************/
 
 /***************** Macros (Inline Functions) Definitions *********************/
@@ -47,18 +46,22 @@
 
 static int adlak_cmq_public_patch_and_exec(struct adlak_task *ptask);
 static int adlak_cmq_private_patch_and_exec(struct adlak_task *ptask);
-static int adlak_net_pre_progress(struct adlak_context *context);
+static int adlak_net_pre_progress(struct adlak_context *   context,
+                                  struct adlak_model_attr *pmodel_attr);
 
 static int adlak_cmq_dump(struct adlak_task *ptask) {
 #ifdef CONFIG_ADLAK_DEBUG_CMQ_DUMP
     struct adlak_device *padlak = ptask->context->padlak;
 
     uint32_t                 start, end;
-    uint32_t *               pcmq_buf     = NULL;
-    struct adlak_cmq_buffer *cmq_buf_info = ptask->context->pmodel_attr->cmq_buffer;  // TODO
+    uint32_t *               pcmq_buf    = NULL;
+    struct adlak_model_attr *pmodel_attr = NULL;
+    struct adlak_cmq_buffer *cmq_buf_info;
+    pmodel_attr  = adlak_get_model_attr(ptask->context, ptask->sub_tasks_idx);
+    cmq_buf_info = pmodel_attr->cmq_buffer;  // TODO
     adlak_os_printf("Dump cmq buffer:");
     pcmq_buf = adlak_mem_vmap(cmq_buf_info->cmq_mm_info);
-    if (ADLAK_CMQ_BUFFER_TYPE_PRIVATE == ptask->context->pmodel_attr->cmq_buffer_type) {
+    if (ADLAK_CMQ_BUFFER_TYPE_PRIVATE == pmodel_attr->cmq_buffer_type) {
         start = 0;
         end   = cmq_buf_info->size / sizeof(uint32_t);
     } else {
@@ -299,12 +302,12 @@ static uint32_t adlak_gen_dep_cmd(int dependency_mode, const struct adlak_submit
             }
         }
 #if ADLAK_DEBUG_CMQ_PATTTCHING_EN
-        AML_LOG_DEBUG("pwe_dlid =%ld, pwx_dlid =%ld,rs_dlid=%ld", pwe_dlid, pwx_dlid, rs_dlid);
+        AML_LOG_DEBUG("pwe_dlid =%d, pwx_dlid =%d,rs_dlid=%d", pwe_dlid, pwx_dlid, rs_dlid);
 #endif
         if (pwe_dlid >= 0) {
             if (pwe_dlid >= pwe_flid_offset) {
 #if ADLAK_DEBUG_CMQ_PATTTCHING_EN
-                AML_LOG_DEBUG("pwe_dlid =%ld, pwe_flid_offset =%d,start_pwe_flid=%d", pwe_dlid,
+                AML_LOG_DEBUG("pwe_dlid =%d, pwe_flid_offset =%d,start_pwe_flid=%d", pwe_dlid,
                               pwe_flid_offset, task->start_pwe_flid);
 #endif
                 has_pwe_dependency = adlak_has_dependency(
@@ -316,7 +319,7 @@ static uint32_t adlak_gen_dep_cmd(int dependency_mode, const struct adlak_submit
         if (pwx_dlid >= 0) {
             if (pwx_dlid >= pwx_flid_offset) {
 #if ADLAK_DEBUG_CMQ_PATTTCHING_EN
-                AML_LOG_DEBUG("pwx_dlid =%ld, pwx_flid_offset =%d,start_pwx_flid=%d", pwx_dlid,
+                AML_LOG_DEBUG("pwx_dlid =%d, pwx_flid_offset =%d,start_pwx_flid=%d", pwx_dlid,
                               pwx_flid_offset, task->start_pwx_flid);
 #endif
                 has_pwx_dependency = adlak_has_dependency(
@@ -329,7 +332,7 @@ static uint32_t adlak_gen_dep_cmd(int dependency_mode, const struct adlak_submit
         if (rs_dlid >= 0) {
             if (rs_dlid >= rs_flid_offset) {
 #if ADLAK_DEBUG_CMQ_PATTTCHING_EN
-                AML_LOG_DEBUG("rs_dlid =%ld, rs_flid_offset =%d,start_rs_flid=%d\n", rs_dlid,
+                AML_LOG_DEBUG("rs_dlid =%d, rs_flid_offset =%d,start_rs_flid=%d\n", rs_dlid,
                               rs_flid_offset, task->start_rs_flid);
 #endif
                 has_rs_dependency = adlak_has_dependency(
@@ -439,6 +442,27 @@ static void adlak_update_reg_fixups(int dependency_mode, const struct adlak_subm
             AML_LOG_ERR("reg_fixup->type=%u", reg_fixup->type);
             ASSERT(0);
         }
+    }
+}
+
+static void adlak_update_reg_fixups_for_input(
+    struct adlak_submit_reg_fixup_for_input *preg_fixups_base, adlak_circular_buffer *buffer,
+    uint32_t cmq_offset_cfg) {
+    uint32_t cmq_offset;
+    if (preg_fixups_base->type == ADLAK_REG_FIXUP_TYPE_FOR_INPUTS) {
+        cmq_offset =
+            adlak_cmq_cal_tail(buffer, cmq_offset_cfg, (preg_fixups_base->loc / sizeof(uint32_t)));
+        buffer->data[cmq_offset] = (buffer->data[cmq_offset] & (~preg_fixups_base->value_0_mask)) |
+                                   (preg_fixups_base->value_0 & preg_fixups_base->value_0_mask);
+        cmq_offset++;
+        buffer->data[cmq_offset] = (buffer->data[cmq_offset] & (~preg_fixups_base->value_1_mask)) |
+                                   (preg_fixups_base->value_1 & preg_fixups_base->value_1_mask);
+        cmq_offset++;
+        buffer->data[cmq_offset] = (buffer->data[cmq_offset] & (~preg_fixups_base->value_2_mask)) |
+                                   (preg_fixups_base->value_2 & preg_fixups_base->value_2_mask);
+        cmq_offset++;
+        buffer->data[cmq_offset] = (buffer->data[cmq_offset] & (~preg_fixups_base->value_3_mask)) |
+                                   (preg_fixups_base->value_3 & preg_fixups_base->value_3_mask);
     }
 }
 
@@ -639,7 +663,7 @@ static struct adlak_model_attr *adlak_model_create(struct adlak_context *     co
         if (!target_buf) {
             AML_LOG_ERR("no corresponding buffer found in this context!");
             ret = ERR(ENOMEM);
-            goto err_alloc_reg_fixups;
+            goto err_check_cmq_buffer;
         } else {
             pmodel_attr->cmd_buf_attr.mm_info = target_buf->mm_info;
         }
@@ -731,6 +755,8 @@ static struct adlak_model_attr *adlak_model_create(struct adlak_context *     co
     return pmodel_attr;
 
 err_copy_from_user:
+err_check_cmq_buffer:
+
     if (pmodel_attr->submit_reg_fixups) {
         adlak_os_vfree(pmodel_attr->submit_reg_fixups);
     }
@@ -774,9 +800,14 @@ void adlak_model_destroy(struct adlak_model_attr *pmodel_attr) {
         adlak_os_free(pmodel_attr->submit_addr_fixups);
         pmodel_attr->submit_addr_fixups = NULL;
     }
+    if (pmodel_attr->submit_reg_fixups_for_input) {
+        adlak_os_free(pmodel_attr->submit_reg_fixups_for_input);
+        pmodel_attr->submit_reg_fixups_for_input = NULL;
+    }
 #endif
 
-    pmodel_attr->submit_addr_fixups = NULL;
+    pmodel_attr->submit_addr_fixups          = NULL;
+    pmodel_attr->submit_reg_fixups_for_input = NULL;
     if (pmodel_attr->cmq_offsets) {
         adlak_os_free(pmodel_attr->cmq_offsets);
         pmodel_attr->cmq_offsets = NULL;
@@ -792,7 +823,7 @@ void adlak_model_destroy(struct adlak_model_attr *pmodel_attr) {
 }
 
 static void adlak_mark_the_last_hw_layer(struct adlak_model_attr *pmodel_attr) {
-    uint32_t                  task_idx;
+    int32_t                   task_idx;
     struct adlak_submit_task *psubmitask_base = NULL, *psubmitask = NULL;
 
     AML_LOG_DEBUG("%s", __func__);
@@ -868,7 +899,7 @@ static struct adlak_task *adlak_invoke_create(struct adlak_context *            
     struct adlak_task *      pinvoke_attr;
     int                      ret;
     AML_LOG_DEBUG("%s", __func__);
-    pmodel_attr = context->pmodel_attr;
+    pmodel_attr = context->pmodel_attr_list[pinvoke_desc->sub_tasks_idx];
     if (!pmodel_attr) {
         AML_LOG_ERR("not found network!");
         return ADLAK_ERR_PTR(ERR(ENXIO));
@@ -889,6 +920,7 @@ static struct adlak_task *adlak_invoke_create(struct adlak_context *            
     } else {
         pinvoke_attr = pmodel_attr->invoke_attr_rsv;
     }
+
     if (pinvoke_desc->addr_fixups_num) {
 #ifndef CONFIG_ADLA_FREERTOS
         if (pmodel_attr->submit_addr_fixups &&
@@ -918,21 +950,49 @@ static struct adlak_task *adlak_invoke_create(struct adlak_context *            
             goto err_copy_from_user;
         }
 
+        pmodel_attr->reg_fixups_num_for_input = pinvoke_desc->reg_fixups_num_for_input;
+
+        if (NULL == pmodel_attr->submit_reg_fixups_for_input) {
+            pmodel_attr->submit_reg_fixups_for_input =
+                adlak_os_malloc(sizeof(struct adlak_submit_reg_fixup_for_input) *
+                                    pmodel_attr->reg_fixups_num_for_input,
+                                ADLAK_GFP_KERNEL);
+            if (!pmodel_attr->submit_reg_fixups_for_input) {
+                AML_LOG_ERR("alloc buffer for save submit_reg_fixups_for_input failed!");
+                return ADLAK_ERR_PTR(ERR(EINVAL));
+            }
+        }
+        /*****copy data from user*****/
+        ret = copy_from_user((void *)pmodel_attr->submit_reg_fixups_for_input,
+                             (void __user *)(uintptr_t)pinvoke_desc->reg_fixups_va_for_input,
+                             sizeof(struct adlak_submit_reg_fixup_for_input) *
+                                 pmodel_attr->reg_fixups_num_for_input);
+        if (ret) {
+            AML_LOG_ERR("copy from user failed!");
+            pmodel_attr = ADLAK_ERR_PTR(ERR(EFAULT));
+            goto err_copy_from_user;
+        }
+
 #else
 
         pmodel_attr->addr_fixups_num = pinvoke_desc->addr_fixups_num;
         pmodel_attr->submit_addr_fixups = (void *)(uintptr_t)pinvoke_desc->addr_fixups_va;
+        pmodel_attr->reg_fixups_num_for_input = pinvoke_desc->reg_fixups_num_for_input;
+        pmodel_attr->submit_reg_fixups_for_input =
+            (void *)(uintptr_t)pinvoke_desc->reg_fixups_va_for_input;
 
 #endif
     }
 
     pinvoke_attr->context = context;
 
-    ++pmodel_attr->invoke_count;
-    if (pmodel_attr->invoke_count < 0) {
-        pmodel_attr->invoke_count = 0;
+    ++context->invoke_count;
+    if (context->invoke_count < 0) {
+        context->invoke_count = 0;
     }
-    pinvoke_attr->invoke_idx          = pmodel_attr->invoke_count;
+
+    pinvoke_attr->sub_tasks_idx       = pinvoke_desc->sub_tasks_idx;
+    pinvoke_attr->invoke_idx          = context->invoke_count;
     pinvoke_desc->invoke_register_idx = pinvoke_attr->invoke_idx;  // return invoke index
     pinvoke_attr->invoke_start_idx    = pinvoke_desc->start_idx;
     pinvoke_attr->invoke_end_idx      = pinvoke_desc->end_idx;
@@ -943,6 +1003,9 @@ static struct adlak_task *adlak_invoke_create(struct adlak_context *            
 
 err_copy_from_user:
 #ifndef CONFIG_ADLA_FREERTOS
+    if (pmodel_attr->submit_reg_fixups_for_input) {
+        adlak_os_free(pmodel_attr->submit_reg_fixups_for_input);
+    }
     if (pmodel_attr->submit_addr_fixups) {
         adlak_os_free(pmodel_attr->submit_addr_fixups);
     }
@@ -1005,8 +1068,8 @@ static int adlak_invoke_del_from_sch_list(struct list_head *hd, int32_t net_id, 
     }
     return ret;
 }
-static int adlak_invoke_del_with_invokeid(struct adlak_device *padlak, int32_t net_id,
-                                          int32_t invoke_id) {
+
+int adlak_invoke_del_with_invokeid(struct adlak_device *padlak, int32_t net_id, int32_t invoke_id) {
     /*
    - if in pendding list,
      - mutex lock;
@@ -1055,8 +1118,8 @@ int adlak_invoke_del_all(struct adlak_device *padlak, int32_t net_id) {
     return adlak_invoke_del_with_invokeid(padlak, net_id, -1);
 }
 
-static int adlak_net_attach(struct adlak_context *     context,
-                            struct adlak_network_desc *psubmit_desc) {
+static int adlak_net_attach(struct adlak_context *context, struct adlak_network_desc *psubmit_desc,
+                            uint32_t sub_tasks_idx) {
     int                      ret         = 0;
     struct adlak_device *    padlak      = context->padlak;
     struct adlak_model_attr *pmodel_attr = NULL;
@@ -1071,12 +1134,11 @@ static int adlak_net_attach(struct adlak_context *     context,
         ret = -1;
         goto err;
     }
-    context->pmodel_attr = pmodel_attr;
-    ret                  = adlak_invoke_pre_check(pmodel_attr);
+    context->pmodel_attr_list[sub_tasks_idx] = pmodel_attr;
+    ret                                      = adlak_invoke_pre_check(pmodel_attr);
     if (ret) {
         adlak_model_destroy(pmodel_attr);
-
-        context->pmodel_attr = NULL;
+        context->pmodel_attr_list[sub_tasks_idx] = NULL;
         goto err;
     }
     adlak_mark_the_last_hw_layer(pmodel_attr);
@@ -1087,7 +1149,7 @@ static int adlak_net_attach(struct adlak_context *     context,
                  pmodel_attr->hw_layer_last_in_first_smmu_table);
 
     /*3.prrogress the command buffer*/
-    ret = adlak_net_pre_progress(context);
+    ret = adlak_net_pre_progress(context, pmodel_attr);
     if (ret) {
         goto err;
     }
@@ -1103,7 +1165,7 @@ static int adlak_net_attach(struct adlak_context *     context,
     if (ADLAK_CMQ_BUFFER_TYPE_PUBLIC == pmodel_attr->cmq_buffer_type) {
         cmq_buf_info = (struct adlak_cmq_buffer *)pmodel_attr->cmq_buffer;
         if (pmodel_attr->size_max_in_layer > cmq_buf_info->size) {
-            ret = -1;
+            ret = ADLAK_PREPARE_CMQ_FAIL;
             AML_LOG_ERR(
                 "the maximum size limit is exceeded which the cmq need (%d),but buffer size "
                 "max(%d);"
@@ -1155,7 +1217,8 @@ static int adlak_invoke_add_queue(struct adlak_context *            context,
         ret = -1;
         goto err;
     }
-    ptask->state = ADLAK_SUBMIT_STATE_PENDING;
+    ptask->state      = ADLAK_SUBMIT_STATE_PENDING;
+    ptask->error_code = ADLAK_SUCCESS;
 
     context->state = CONTEXT_STATE_USED;
     context->invoke_cnt++;
@@ -1181,7 +1244,7 @@ static int adlak_net_register_pre_check(struct adlak_context *     context,
     AML_LOG_DEBUG("%s", __func__);
     /*1.if Suppose the maximum count has been reached,then **return err***/
     if (padlak->all_task_num >= padlak->all_task_num_max) {
-        ret = -1;
+        ret = ADLAK_TASK_NUMS_EXCEEDS;
         AML_LOG_WARN("Suppose the maximum count has been reached,Please try again later.");
         goto err;
     }
@@ -1191,9 +1254,9 @@ err:
     return ret;
 }
 
-static void adlak_net_pre_progress_part1(struct adlak_context *context) {
+static void adlak_net_pre_progress_part1(struct adlak_context *   context,
+                                         struct adlak_model_attr *pmodel_attr) {
     struct adlak_submit_task *psubmitask_base = NULL, *psubmitask = NULL;
-    struct adlak_model_attr * pmodel_attr = NULL;
     uint32_t                  task_idx, module_index, active_modules, output_modules, fence_modules;
     const uint32_t            parser_active_modules[ADLAK_PLATFORM_MODULE_COUNT] = {
         PS_CMD_CONFIG_RS_MASK,      // ADLAK_PLATFORM_MODULE_RS
@@ -1212,7 +1275,6 @@ static void adlak_net_pre_progress_part1(struct adlak_context *context) {
         PS_CMD_CONFIG_PWX_MASK      // ADLAK_PLATFORM_MODULE_PWX
     };
 
-    pmodel_attr     = context->pmodel_attr;
     psubmitask_base = pmodel_attr->submit_tasks;
 
     for (task_idx = 0; task_idx < pmodel_attr->submit_tasks_num; task_idx++) {
@@ -1262,21 +1324,20 @@ static void adlak_net_pre_progress_part1(struct adlak_context *context) {
     }
 }
 
-static int adlak_net_pre_progress(struct adlak_context *context) {
+static int adlak_net_pre_progress(struct adlak_context *   context,
+                                  struct adlak_model_attr *pmodel_attr) {
     struct adlak_device *     padlak          = context->padlak;
     struct adlak_submit_task *psubmitask_base = NULL, *psubmitask = NULL;
-    struct adlak_model_attr * pmodel_attr = NULL;
     uint32_t                  task_idx;
     // uint32_t *                modify_buf, modify_size, cmd_count, cmd_count_max;
     uint32_t *modify_buf, modify_size;
     uint8_t * config_base = NULL;
     /*If the hardware supports parser_v2 modify part of the content, otherwise skip directly*/
     struct adlak_hw_info *phw_info = (struct adlak_hw_info *)padlak->hw_info;
-    pmodel_attr                    = context->pmodel_attr;
 
     AML_LOG_DEBUG("%s", __func__);
 
-    adlak_net_pre_progress_part1(context);
+    adlak_net_pre_progress_part1(context, pmodel_attr);
 
 #define ADLAK_VER_PARSR_V2 (0x0400)
     if (phw_info->rev.all < ADLAK_VER_PARSR_V2) {
@@ -1347,11 +1408,93 @@ end:
     return 0;
 }
 
+int adlak_nets_register_request(struct adlak_context *      context,
+                                struct adlak_networks_desc *nets_desc) {
+    int                        ret = 0;
+    uint32_t                   sub_tasks_idx;
+    struct adlak_network_desc  submit_desc;
+    struct adlak_network_desc *psubmit_desc = &submit_desc;
+    AML_LOG_DEBUG("%s", __func__);
+
+#ifndef CONFIG_ADLA_FREERTOS
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
+    if (!adlak_access_ok((void __user *)(uintptr_t)nets_desc->networks_desc_va,
+                         sizeof(struct adlak_network_desc) * nets_desc->sub_tasks_count))
+        return ERR(EFAULT);
+
+#else
+    if (!adlak_access_ok(VERIFY_READ, (void __user *)((uintptr_t)nets_desc->networks_desc_va),
+                         sizeof(struct adlak_network_desc) * nets_desc->sub_tasks_count))
+        return ERR(EFAULT);
+#endif
+
+    if (nets_desc->sub_tasks_count > 10000) {
+        return ERR(ENOMEM);
+    }
+#endif
+
+    context->sub_tasks_count = nets_desc->sub_tasks_count;
+    context->pmodel_attr_list =
+        adlak_os_zalloc(sizeof(void *) * nets_desc->sub_tasks_count, ADLAK_GFP_KERNEL);
+    if (!context->pmodel_attr_list) {
+        return ERR(ENOMEM);
+    }
+
+    for (sub_tasks_idx = 0; sub_tasks_idx < context->sub_tasks_count; sub_tasks_idx++) {
+#ifndef CONFIG_ADLA_FREERTOS
+        /*****copy data from user*****/
+        ret = copy_from_user(
+            (void *)psubmit_desc,
+            (void __user *)(uintptr_t)(nets_desc->networks_desc_va +
+                                       (sizeof(struct adlak_network_desc) * sub_tasks_idx)),
+            sizeof(struct adlak_network_desc));
+        if (ret) {
+            AML_LOG_ERR("copy from user failed!");
+            ret = ERR(EFAULT);
+            goto err_copy_from_user;
+        }
+#else
+        psubmit_desc = (void *)(uintptr_t)(nets_desc->networks_desc_va +
+                                           (sizeof(struct adlak_network_desc) * sub_tasks_idx));
+#endif
+        ret = adlak_net_register_request(context, psubmit_desc, sub_tasks_idx);
+        if (ret) {
+            break;
+        }
+    }
+    nets_desc->net_register_idx = context->net_id;
+
+err_copy_from_user:
+    if (ret) {
+        if (context->pmodel_attr_list) {
+            adlak_net_dettach(context);
+            adlak_os_free(context->pmodel_attr_list);
+            context->pmodel_attr_list = NULL;
+        }
+    }
+    return ret;
+}
+
 int adlak_net_register_request(struct adlak_context *     context,
-                               struct adlak_network_desc *psubmit_desc) {
+                               struct adlak_network_desc *psubmit_desc, uint32_t sub_tasks_idx) {
     int ret = 0;
+
     AML_LOG_INFO("%s", __func__);
 #ifndef CONFIG_ADLA_FREERTOS
+
+    if (psubmit_desc->tasks_num < 0 || psubmit_desc->tasks_num > 0x100000) {
+        return ERR(ENOMEM);
+    }
+    if (psubmit_desc->config_total_size < 0 || psubmit_desc->config_total_size > 0x8000000) {
+        return ERR(ENOMEM);
+    }
+    if (psubmit_desc->dep_fixups_num < 0 || psubmit_desc->dep_fixups_num > 0x100000) {
+        return ERR(ENOMEM);
+    }
+    if (psubmit_desc->reg_fixups_num < 0 || psubmit_desc->reg_fixups_num > 0x100000) {
+        return ERR(ENOMEM);
+    }
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
     if (!adlak_access_ok((void __user *)(uintptr_t)psubmit_desc->tasks_va,
                          sizeof(struct adlak_submit_task) * psubmit_desc->tasks_num))
@@ -1382,7 +1525,7 @@ int adlak_net_register_request(struct adlak_context *     context,
         goto err;
     }
     /*2.add to workqueue*/
-    ret = adlak_net_attach(context, psubmit_desc);
+    ret = adlak_net_attach(context, psubmit_desc, sub_tasks_idx);
     if (ret) {
         goto err;
     }
@@ -1394,6 +1537,7 @@ int adlak_net_register_request(struct adlak_context *     context,
 err:
     return ret;
 }
+
 int adlak_net_unregister_request(struct adlak_context *         context,
                                  struct adlak_network_del_desc *submit_del) {
     int                  ret    = 0;
@@ -1403,7 +1547,11 @@ int adlak_net_unregister_request(struct adlak_context *         context,
 
     ret = adlak_invoke_del_with_invokeid(padlak, submit_del->net_register_idx, -1);
     if (0 == ret) {
-        adlak_net_dettach_by_id(context, submit_del->net_register_idx);
+        if (context->pmodel_attr_list) {
+            adlak_net_dettach(context);
+            adlak_os_free(context->pmodel_attr_list);
+            context->pmodel_attr_list = NULL;
+        }
     }
     return 0;
 }
@@ -1415,7 +1563,8 @@ int adlak_invoke_request(struct adlak_context *            context,
     struct adlak_workqueue *pwq    = NULL;
     // struct adlak_device *padlak = context->padlak;
     AML_LOG_INFO("%s", __func__);
-    AML_LOG_DEBUG("net_id=%d", pinvoke_desc->net_register_idx);
+    AML_LOG_DEBUG("net_id=%d sub_id=%d", pinvoke_desc->net_register_idx,
+                  pinvoke_desc->sub_tasks_idx);
     AML_LOG_DEBUG("invoke_id=%d", pinvoke_desc->invoke_register_idx);
     AML_LOG_DEBUG("invoke start_idx=%d", pinvoke_desc->start_idx);
     AML_LOG_DEBUG("invoke end_idx=%d", pinvoke_desc->end_idx);
@@ -1423,14 +1572,34 @@ int adlak_invoke_request(struct adlak_context *            context,
     adlak_dbg_inner_update(context, "invoke_request");
 #endif
 #ifndef CONFIG_ADLA_FREERTOS
+    if (pinvoke_desc->addr_fixups_num < 0 || pinvoke_desc->addr_fixups_num > 0x100000) {
+        return ERR(ENOMEM);
+    }
+    if (pinvoke_desc->reg_fixups_num_for_input < 0 ||
+        pinvoke_desc->reg_fixups_num_for_input > 0x100000) {
+        return ERR(ENOMEM);
+    }
+    if (pinvoke_desc->sub_tasks_idx >= context->sub_tasks_count) {
+        return ERR(ENOMEM);
+    }
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
     if (!adlak_access_ok((void __user *)(uintptr_t)pinvoke_desc->addr_fixups_va,
                          sizeof(struct adlak_submit_addr_fixup) * pinvoke_desc->addr_fixups_num))
+        return ERR(EFAULT);
+    if (!adlak_access_ok((void __user *)(uintptr_t)pinvoke_desc->reg_fixups_va_for_input,
+                         sizeof(struct adlak_submit_reg_fixup_for_input) *
+                             pinvoke_desc->reg_fixups_num_for_input))
         return ERR(EFAULT);
 
 #else
     if (!adlak_access_ok(VERIFY_READ, (void __user *)((uintptr_t)pinvoke_desc->addr_fixups_va),
                          sizeof(struct adlak_submit_addr_fixup) * pinvoke_desc->addr_fixups_num))
+        return ERR(EFAULT);
+    if (!adlak_access_ok(VERIFY_READ,
+                         (void __user *)((uintptr_t)pinvoke_desc->reg_fixups_va_for_input),
+                         sizeof(struct adlak_submit_reg_fixup_for_input) *
+                             pinvoke_desc->reg_fixups_num_for_input))
         return ERR(EFAULT);
 #endif
 
@@ -1508,7 +1677,8 @@ int adlak_get_status_request(struct adlak_context *context, struct adlak_get_sta
                 stat_desc->mem_pool_size    = mem_usage.pool_size;
                 stat_desc->mem_pool_used =
                     mem_usage.alloced_kmd + mem_usage.alloced_umd + mem_usage.share_buf_size;
-                stat_desc->efficiency = adlak_dmp_get_efficiency(padlak);
+                stat_desc->efficiency   = adlak_dmp_get_efficiency(padlak);
+                stat_desc->exrta_status = ptask->hw_stat.extra_status;
                 if (ADLAK_SUBMIT_STATE_FINISHED == ptask->state) {
                     stat_desc->ret_state = 0;
                 } else {
@@ -1523,9 +1693,7 @@ int adlak_get_status_request(struct adlak_context *context, struct adlak_get_sta
 
 int adlak_profile_config(struct adlak_context *         context,
                          struct adlak_profile_cfg_desc *profile_cfg) {
-    int                      ret = 0;
     struct adlak_model_attr *pmodel_attr;
-    // struct adlak_device *padlak = context->padlak;
     AML_LOG_DEBUG("%s", __func__);
     AML_LOG_DEBUG("net_idx=%d", profile_cfg->net_register_idx);
     AML_LOG_INFO("profile_en=%d", profile_cfg->profile_en);
@@ -1533,22 +1701,16 @@ int adlak_profile_config(struct adlak_context *         context,
     AML_LOG_INFO("profile_buf_size=%lu KByte", (uintptr_t)(profile_cfg->profile_buf_size / 1024));
 
     adlak_os_mutex_lock(&context->context_mutex);
-    pmodel_attr = (context->pmodel_attr);
-    if (!pmodel_attr) {
-        AML_LOG_ERR("not found network!");
-        profile_cfg->errcode = 1;
-        ret                  = -1;
-        goto err;
+    pmodel_attr = adlak_get_model_attr(context, profile_cfg->sub_tasks_idx);
+    if (pmodel_attr) {
+        pmodel_attr->pm_cfg.profile_en       = profile_cfg->profile_en;
+        pmodel_attr->pm_cfg.profile_iova     = profile_cfg->profile_iova;
+        pmodel_attr->pm_cfg.profile_buf_size = profile_cfg->profile_buf_size;
     }
-    pmodel_attr->pm_cfg.profile_en       = profile_cfg->profile_en;
-    pmodel_attr->pm_cfg.profile_iova     = profile_cfg->profile_iova;
-    pmodel_attr->pm_cfg.profile_buf_size = profile_cfg->profile_buf_size;
     adlak_os_mutex_unlock(&context->context_mutex);
 
     profile_cfg->errcode = 0;
     return 0;
-err:
-    return ret;
 }
 
 int adlak_queue_update_task_state(struct adlak_device *padlak, struct adlak_task *ptask) {
@@ -1605,7 +1767,8 @@ int adlak_queue_update_task_state(struct adlak_device *padlak, struct adlak_task
 
 int adlak_parser_preempt(struct adlak_device *padlak, struct adlak_task *ptask) {
     int                      ret;
-    struct adlak_model_attr *pmodel_attr  = ptask->context->pmodel_attr;
+    struct adlak_model_attr *pmodel_attr =
+        adlak_get_model_attr(ptask->context, ptask->sub_tasks_idx);
     struct adlak_cmq_buffer *cmq_buf_info = (struct adlak_cmq_buffer *)pmodel_attr->cmq_buffer;
     AML_LOG_DEBUG("%s", __func__);
 
@@ -1637,7 +1800,7 @@ static int adlak_parser_resume(struct adlak_device *padlak, struct adlak_task *p
 
     struct adlak_model_attr *pmodel_attr;
     context     = (struct adlak_context *)ptask->context;
-    pmodel_attr = context->pmodel_attr;
+    pmodel_attr = adlak_get_model_attr(ptask->context, ptask->sub_tasks_idx);
 
     if (0 == cmq_buf_info->parser_storage_info.size) {
         // parser_storage_info is not initial
@@ -1675,8 +1838,7 @@ static int adlak_parser_resume(struct adlak_device *padlak, struct adlak_task *p
         // cmq changed
         resume                       = 1;
         padlak->queue.cmq_buffer_pre = pmodel_attr->cmq_buffer;
-    } else if (ADLAK_CMQ_BUFFER_TYPE_PRIVATE == pmodel_attr->cmq_buffer_type) {
-        // the cmq is private
+    } else {
         if (ptask->invoke_start_idx == pmodel_attr->hw_layer_first) {
             resume = 1;
         }
@@ -1698,12 +1860,13 @@ err:
 
 int adlak_wait_until_finished(struct adlak_context *      context,
                               struct adlak_get_stat_desc *stat_desc) {
-    struct adlak_device *   padlak = context->padlak;
-    struct adlak_workqueue *pwq    = &padlak->queue;
-    struct adlak_task *     ptask = NULL, *ptask_tmp = NULL;
-    int32_t                 finished   = 0;
-    int32_t                 find_netid = -1;
-    struct adlak_mem_usage  mem_usage;
+    struct adlak_device *    padlak = context->padlak;
+    struct adlak_workqueue * pwq    = &padlak->queue;
+    struct adlak_task *      ptask = NULL, *ptask_tmp = NULL;
+    int32_t                  finished   = 0;
+    int32_t                  find_netid = -1;
+    struct adlak_mem_usage   mem_usage;
+    struct adlak_model_attr *pmodel_attr = NULL;
     AML_LOG_DEBUG("%s", __func__);
     while (1) {
         if (ERR(NONE) == adlak_os_sema_take_timeout(context->invoke_state, stat_desc->timeout_ms)) {
@@ -1743,31 +1906,37 @@ int adlak_wait_until_finished(struct adlak_context *      context,
 
     if (1 == finished) {
         ASSERT(ptask);
+        pmodel_attr = adlak_get_model_attr(ptask->context, ptask->sub_tasks_idx);
         adlak_os_mutex_lock(&padlak->dev_mutex);
-        stat_desc->profile_en      = ptask->context->pmodel_attr->pm_cfg.profile_en;
-        stat_desc->invoke_time_us  = ptask->profilling.time_elapsed_us;
-        stat_desc->start_idx       = ptask->invoke_start_idx;
-        stat_desc->end_idx         = ptask->invoke_end_idx;
-        stat_desc->profile_rpt     = 0;
-        stat_desc->axi_freq_cur    = ptask->clk_axi_freq_real;
-        stat_desc->core_freq_cur   = ptask->clk_core_freq_real;
-        stat_desc->mem_alloced_umd = context->smmu_attr.alloc_byte;
+        if (pmodel_attr) {
+            stat_desc->profile_en      = pmodel_attr->pm_cfg.profile_en;
+            stat_desc->invoke_time_us  = ptask->profilling.time_elapsed_us;
+            stat_desc->start_idx       = ptask->invoke_start_idx;
+            stat_desc->end_idx         = ptask->invoke_end_idx;
+            stat_desc->profile_rpt     = 0;
+            stat_desc->axi_freq_cur    = ptask->clk_axi_freq_real;
+            stat_desc->core_freq_cur   = ptask->clk_core_freq_real;
+            stat_desc->mem_alloced_umd = context->smmu_attr.alloc_byte;
 
-        adlak_mem_get_usage(&mem_usage);
-        stat_desc->mem_alloced_base = mem_usage.alloced_kmd;
-        stat_desc->mem_pool_size    = mem_usage.pool_size;
-        stat_desc->mem_pool_used =
-            mem_usage.alloced_kmd + mem_usage.alloced_umd + mem_usage.share_buf_size;
-        stat_desc->efficiency = adlak_dmp_get_efficiency(padlak);
-        if (ADLAK_SUBMIT_STATE_FINISHED == ptask->state) {
-            stat_desc->ret_state = 0;
-        } else {
-            stat_desc->ret_state = -3;  // TODO
+            adlak_mem_get_usage(&mem_usage);
+            stat_desc->mem_alloced_base = mem_usage.alloced_kmd;
+            stat_desc->mem_pool_size    = mem_usage.pool_size;
+            stat_desc->mem_pool_used =
+                mem_usage.alloced_kmd + mem_usage.alloced_umd + mem_usage.share_buf_size;
+            stat_desc->efficiency   = adlak_dmp_get_efficiency(padlak);
+            stat_desc->exrta_status = ptask->hw_stat.extra_status;
+        } else if (ptask->context->ptee_model_attr) {
+            stat_desc->profile_en      = 0;
+            stat_desc->axi_freq_cur    = 0;
+            stat_desc->core_freq_cur   = 0;
+            stat_desc->mem_alloced_umd = 0;
+            stat_desc->mem_pool_used   = 0;
         }
+        stat_desc->ret_state = ptask->error_code;
         adlak_os_mutex_unlock(&padlak->dev_mutex);
 
     } else if (-1 == finished) {
-        stat_desc->ret_state = -1;  // timeout
+        stat_desc->ret_state = ADLAK_INVOKE_TIMEOUT;  // timeout
     } else {
         // not go here
         ASSERT(0);
@@ -1781,7 +1950,7 @@ int adlak_submit_patch_and_exec(struct adlak_task *ptask) {
     struct adlak_cmq_buffer *cmq_buf_info = NULL;
     struct adlak_model_attr *pmodel_attr;
     int                      ret;
-    pmodel_attr  = ptask->context->pmodel_attr;
+    pmodel_attr  = adlak_get_model_attr(ptask->context, ptask->sub_tasks_idx);
     cmq_buf_info = pmodel_attr->cmq_buffer;
     AML_LOG_INFO("%s", __func__);
     if (ptask->state != ADLAK_SUBMIT_STATE_PENDING) {
@@ -1802,9 +1971,10 @@ int adlak_submit_patch_and_exec(struct adlak_task *ptask) {
 #endif
 
     adlak_profile_start(padlak, ptask->context, &pmodel_attr->pm_cfg, &pmodel_attr->pm_stat,
-    (ptask->invoke_start_idx <= ptask->context->pmodel_attr->hw_layer_first) ? 1 : 0);
-
-    ptask->state = ADLAK_SUBMIT_STATE_RUNNING;
+                        ptask->invoke_start_idx);
+                        // (ptask->invoke_start_idx <= ptask->context->pmodel_attr->hw_layer_first) ? 1 : 0);    // driver 1.4
+    ptask->state                = ADLAK_SUBMIT_STATE_RUNNING;
+    ptask->hw_stat.extra_status = 0;
 
     if (ADLAK_CMQ_BUFFER_TYPE_PRIVATE == pmodel_attr->cmq_buffer_type) {
         ret = adlak_cmq_private_patch_and_exec(ptask);
@@ -1821,6 +1991,9 @@ int adlak_submit_patch_and_exec(struct adlak_task *ptask) {
     invoke_num                        = ptask->invoke_end_idx + 1 - ptask->invoke_start_idx;
 
     pmodel_attr->hw_timeout_ms = padlak->hw_timeout_ms * invoke_num;
+    if (pmodel_attr->hw_timeout_ms < 3000) {
+        pmodel_attr->hw_timeout_ms = 3000;
+    }
     AML_LOG_DEBUG("%s End", __func__);
     return ERR(NONE);
 }
@@ -1850,10 +2023,12 @@ static int adlak_cmq_public_patch_and_exec(struct adlak_task *ptask) {
     int32_t                         config_offset, config_size;
     uint64_t                        smmu_entry;
 
-    struct adlak_sync_cache_ext_info sync_cache_extern;
+    struct adlak_sync_cache_ext_info         sync_cache_extern;
+    int32_t                                  reg_fixup_index = 0;
+    struct adlak_submit_reg_fixup_for_input *reg_fixup_for_input;
     AML_LOG_INFO("%s", __func__);
 
-    pmodel_attr  = ptask->context->pmodel_attr;
+    pmodel_attr  = adlak_get_model_attr(ptask->context, ptask->sub_tasks_idx);
     cmq_buf_info = pmodel_attr->cmq_buffer;
     pcircbuffer  = &circbuffer_cmq;
     smmu_entry   = adlak_mem_get_smmu_entry(NULL, ADLAK_ENUM_SMMU_TLB_TYPE_PUBLIC_ONLY);
@@ -1981,6 +2156,15 @@ static int adlak_cmq_public_patch_and_exec(struct adlak_task *ptask) {
             rs_flid_offset, start_id_pwe, start_id_pwx, start_id_rs, pcircbuffer, cmq_offset_cfg);
         adlak_update_reg_fixups(dependency_mode, psubmitask, psubmit_reg_fixup_base, pcircbuffer,
                                 cmq_offset_cfg);
+
+        for (reg_fixup_index = 0; reg_fixup_index < pmodel_attr->reg_fixups_num_for_input;
+             reg_fixup_index++) {
+            reg_fixup_for_input = &pmodel_attr->submit_reg_fixups_for_input[reg_fixup_index];
+            if (task_idx == reg_fixup_for_input->node_index) {
+                adlak_update_reg_fixups_for_input(reg_fixup_for_input, pcircbuffer, cmq_offset_cfg);
+            }
+        }
+
         adlak_cmq_write_data(pcircbuffer, (PS_CMD_SET_FENCE | psubmitask->fence_modules));
         cmq_size_u32 = 7 + config_size / sizeof(uint32_t);
         nop_size     = ADLAK_ALIGN(cmq_size_u32, (16 / sizeof(uint32_t))) - cmq_size_u32;
@@ -2065,9 +2249,12 @@ static int adlak_cmq_private_patch_and_exec(struct adlak_task *ptask) {
     struct adlak_sync_cache_ext_info sync_cache_extern;
     struct adla_context_cmq_offset * cmq_offset = NULL;
     uint64_t                         smmu_entry = ADLAK_INVALID_ADDR;
+
+    int32_t                                  reg_fixup_index;
+    struct adlak_submit_reg_fixup_for_input *reg_fixup_for_input;
     AML_LOG_INFO("%s", __func__);
 
-    pmodel_attr  = ptask->context->pmodel_attr;
+    pmodel_attr  = adlak_get_model_attr(ptask->context, ptask->sub_tasks_idx);
     cmq_buf_info = pmodel_attr->cmq_buffer;
     pcircbuffer  = &circbuffer_cmq;
 
@@ -2108,6 +2295,17 @@ static int adlak_cmq_private_patch_and_exec(struct adlak_task *ptask) {
 #else
         ptask->time_stamp = ptask->invoke_end_idx;
 #endif
+    }
+
+    for (reg_fixup_index = 0; reg_fixup_index < pmodel_attr->reg_fixups_num_for_input;
+         reg_fixup_index++) {
+        reg_fixup_for_input = &pmodel_attr->submit_reg_fixups_for_input[reg_fixup_index];
+        task_idx            = reg_fixup_for_input->node_index;
+        cmq_offset          = &pmodel_attr->cmq_offsets[task_idx];
+        psubmitask          = psubmitask_base + task_idx;
+        pcircbuffer->tail   = cmq_offset->config_offset;
+        adlak_update_reg_fixups_for_input(reg_fixup_for_input, pcircbuffer,
+                                          cmq_offset->config_offset);
     }
 
     /*flush cmq*/
@@ -2177,34 +2375,41 @@ static int adlak_cmq_private_patch_and_exec(struct adlak_task *ptask) {
     if (ADLAK_INVALID_ADDR != smmu_entry) {  // update smmu table
         adlak_hal_set_mmu(padlak, true, smmu_entry);
     }
-    adlak_hal_submit((void *)padlak, cmq_buf_info->cmq_wr_offset);
-#if CONFIG_ADLAK_EMU_EN
-    g_adlak_emu_dev_wpt = cmq_buf_info->cmq_wr_offset;
+
+#ifdef CONFIG_ADLAK_TEE
+    if (padlak->submit_blocking) {
+        adlak_submit_tee_task(ptask, smmu_entry);
+    } else
 #endif
-    ptask->hw_stat.irq_status.timeout = false;
+    {
+        adlak_hal_submit((void *)padlak, cmq_buf_info->cmq_wr_offset);
+#if CONFIG_ADLAK_EMU_EN
+        g_adlak_emu_dev_wpt = cmq_buf_info->cmq_wr_offset;
+#endif
+        ptask->hw_stat.irq_status.timeout = false;
+    }
 
     return 0;
 }
 
 static int adlak_cmq_private_fill(struct adlak_model_attr *pmodel_attr) {
-    struct adlak_device *           padlak = pmodel_attr->context->padlak;
-    uint32_t                        cmq_offset_cfg;
-    uint32_t                        cmq_size_u32;
-    struct adlak_submit_task *      psubmitask_base = NULL, *psubmitask = NULL;
-    uint32_t                        task_idx;
-    int                             dependency_mode;
-    struct adlak_submit_dep_fixup * psubmit_dep_fixup_base   = NULL;
-    struct adlak_submit_reg_fixup * psubmit_reg_fixup_base   = NULL;
-    struct adlak_submit_addr_fixup *psubmit_addr_fixups_base = NULL;
-    uint8_t *                       config_base              = NULL;
-    uint32_t *                      pcmq_buf                 = NULL;
-    int32_t                         pwe_flid_offset, pwx_flid_offset, rs_flid_offset;
-    int32_t                         start_id_pwe, start_id_pwx, start_id_rs;
-    uint32_t                        nop_size;
-    struct adlak_cmq_buffer *       cmq_buf_info;
-    adlak_circular_buffer           circbuffer_cmq;
-    adlak_circular_buffer *         pcircbuffer;
-    int32_t                         config_offset, config_size;
+    struct adlak_device *          padlak = pmodel_attr->context->padlak;
+    uint32_t                       cmq_offset_cfg;
+    uint32_t                       cmq_size_u32;
+    struct adlak_submit_task *     psubmitask_base = NULL, *psubmitask = NULL;
+    uint32_t                       task_idx;
+    int                            dependency_mode;
+    struct adlak_submit_dep_fixup *psubmit_dep_fixup_base = NULL;
+    struct adlak_submit_reg_fixup *psubmit_reg_fixup_base = NULL;
+    uint8_t *                      config_base            = NULL;
+    uint32_t *                     pcmq_buf               = NULL;
+    int32_t                        pwe_flid_offset, pwx_flid_offset, rs_flid_offset;
+    int32_t                        start_id_pwe, start_id_pwx, start_id_rs;
+    uint32_t                       nop_size;
+    struct adlak_cmq_buffer *      cmq_buf_info;
+    adlak_circular_buffer          circbuffer_cmq;
+    adlak_circular_buffer *        pcircbuffer;
+    int32_t                        config_offset, config_size;
 
     struct adla_context_cmq_offset *cmq_offset = NULL;
     struct {
@@ -2220,10 +2425,9 @@ static int adlak_cmq_private_fill(struct adlak_model_attr *pmodel_attr) {
     // pattching to cmq buffer
     pcmq_buf = adlak_mem_vmap(cmq_buf_info->cmq_mm_info);
 
-    psubmitask_base          = pmodel_attr->submit_tasks;
-    psubmit_dep_fixup_base   = pmodel_attr->submit_dep_fixups;
-    psubmit_reg_fixup_base   = pmodel_attr->submit_reg_fixups;
-    psubmit_addr_fixups_base = pmodel_attr->submit_addr_fixups;
+    psubmitask_base        = pmodel_attr->submit_tasks;
+    psubmit_dep_fixup_base = pmodel_attr->submit_dep_fixups;
+    psubmit_reg_fixup_base = pmodel_attr->submit_reg_fixups;
     if (0 == pmodel_attr->cmd_buf_attr.support) {
         config_base = (uint8_t *)pmodel_attr->config;
     } else {
@@ -2330,7 +2534,6 @@ static int adlak_cmq_private_fill(struct adlak_model_attr *pmodel_attr) {
                                        cmq_offset->config_offset);
         adlak_update_reg_fixups(dependency_mode, psubmitask, psubmit_reg_fixup_base, pcircbuffer,
                                 cmq_offset->config_offset);
-
         if ((pmodel_attr->hw_layer_last == task_idx) ||
             (pmodel_attr->context->smmu_attr.smmu_tlb_type ==
                  ADLAK_ENUM_SMMU_TLB_TYPE_PRIVATE_AND_PUBLIC &&
@@ -2373,7 +2576,7 @@ static int adlak_cmq_private_fill(struct adlak_model_attr *pmodel_attr) {
 #endif
 
         adlak_cmq_write_data(pcircbuffer, task_idx);  // time_stamp
-        cmq_size_u32 = cmq_size_u32 + nop_size;
+
         AML_LOG_DEBUG("cmq_size_u32=%u", cmq_size_u32);
 
         cmq_offset->write_point = adlak_cmq_get_cur_tail(pcircbuffer) * sizeof(uint32_t);
@@ -2408,7 +2611,7 @@ void adlak_prepare_command_queue_private(struct adlak_model_attr *  pmodel_attr,
     struct adlak_device *    padlak       = pmodel_attr->context->padlak;
     AML_LOG_DEBUG("%s", __func__);
 #ifdef CONFIG_ADLAK_DEBUG_CMQ_TYPE
-    if (0 == (psubmit_desc->net_register_idx % 2)) {
+    if (0 == (pmodel_attr->context->net_id % 2)) {
         psubmit_desc->cmq_buffer_type = ADLAK_CMQ_BUFFER_TYPE_PUBLIC;
     } else {
         psubmit_desc->cmq_buffer_type = ADLAK_CMQ_BUFFER_TYPE_PRIVATE;

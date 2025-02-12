@@ -140,7 +140,10 @@ enum ADLAK_DEPENDENCY_MODULE {
     ADLAK_DEPENDENCY_MODULE_SW  = 3,
 };
 
-enum ADLAK_PLATFORM_REG_FIXUP_TYPE { ADLAK_REG_FIXUP_TYPE_PW_COMP_FLUSH_MODE = 0 };
+enum ADLAK_PLATFORM_REG_FIXUP_TYPE {
+    ADLAK_REG_FIXUP_TYPE_PW_COMP_FLUSH_MODE = 0,
+    ADLAK_REG_FIXUP_TYPE_FOR_INPUTS         = 1
+};
 
 struct adlak_submit_dep_fixup {
     uint32_t module;
@@ -164,6 +167,21 @@ struct adlak_submit_reg_fixup {
     uint32_t unit;
     uint32_t modes[MAX_REG_FIXUP_MODES];
 };
+
+struct adlak_submit_reg_fixup_for_input {
+    enum ADLAK_PLATFORM_REG_FIXUP_TYPE type;
+    uint32_t                           node_index;
+    int32_t                            loc;
+    uint32_t                           value_0_mask;
+    uint32_t                           value_0;
+    uint32_t                           value_1_mask;
+    uint32_t                           value_1;
+    uint32_t                           value_2_mask;
+    uint32_t                           value_2;
+    uint32_t                           value_3_mask;
+    uint32_t                           value_3;
+};
+
 struct adlak_submit_addr_fixup {
     int32_t  loc;
     uint32_t shift;
@@ -232,16 +250,17 @@ struct adlak_model_attr {
     uint8_t *                      config;
     int32_t                        config_total_size;
     // invoke fixup
-    int32_t                         addr_fixups_num;
-    struct adlak_submit_addr_fixup *submit_addr_fixups;
-    uint32_t                        hw_timeout_ms;
+    int32_t                                  addr_fixups_num;
+    int32_t                                  reg_fixups_num_for_input;
+    struct adlak_submit_addr_fixup *         submit_addr_fixups;
+    struct adlak_submit_reg_fixup_for_input *submit_reg_fixups_for_input;
+    uint32_t                                 hw_timeout_ms;
 
     int32_t  hw_layer_first;                     // indicate the first layer of hadware
     int32_t  hw_layer_last;                      // indicate the last layer of hadware
     uint32_t hw_layer_last_in_first_smmu_table;  // the last hardware layer in the first smmu table
     struct adlak_pm_cfg   pm_cfg;
     struct adlak_pm_state pm_stat;
-    int32_t               invoke_count;
 
     struct adlak_task
         *invoke_attr_rsv;  // In order to avoid continuous application and release of task memory
@@ -258,6 +277,7 @@ struct adlak_model_attr {
 struct adlak_task {
     struct list_head      head;
     int32_t               invoke_idx;
+    int32_t               sub_tasks_idx;
     struct adlak_context *context;
     int32_t               invoke_start_idx;
     int32_t               invoke_end_idx;
@@ -271,14 +291,22 @@ struct adlak_task {
     uint32_t             time_stamp;
     int                  state;
     uint32_t             flag;  // task_canceled
+    int                  error_code;
     // finish info
     struct adlak_profile profilling;
+
+    // for tee
+    uint32_t invoke_section_id;
+    uint32_t blocking;
 };
 
 /************************** Function Prototypes ******************************/
 
+int adlak_nets_register_request(struct adlak_context *      context,
+                                struct adlak_networks_desc *psubmit_desc);
+
 int  adlak_net_register_request(struct adlak_context *     context,
-                                struct adlak_network_desc *psubmit_desc);
+                                struct adlak_network_desc *psubmit_desc, uint32_t sub_tasks_idx);
 void adlak_irq_bottom_handler(void *arg);
 void adlak_queue_schedule(struct adlak_device *padlak);
 
@@ -294,6 +322,7 @@ int adlak_uninvoke_request(struct adlak_context *                context,
 int adlak_get_status_request(struct adlak_context *context, struct adlak_get_stat_desc *stat_desc);
 int adlak_profile_config(struct adlak_context *context, struct adlak_profile_cfg_desc *profile_cfg);
 
+int adlak_invoke_del_with_invokeid(struct adlak_device *padlak, int32_t net_id, int32_t invoke_id);
 int adlak_invoke_del_all(struct adlak_device *padlak, int32_t net_id);
 int adlak_clear_sch_list(struct adlak_device *padlak);
 

@@ -93,26 +93,43 @@ end:
     return ret;
 }
 
-int adlak_net_dettach_by_id(struct adlak_context *context, int net_id) {
-    int ret = 0;
-    if (context->pmodel_attr) {
-        AML_LOG_DEBUG("%s", __func__);
-        ret++;
-        /*destroy the private command queue*/
-        adlak_destroy_command_queue_private(context->pmodel_attr);
-
-        if (context->smmu_attr.smmu_public) {
-            adlak_mem_destroy_smmu(&context->smmu_attr.smmu_public,
-                                   ADLAK_ENUM_SMMU_TLB_TYPE_PUBLIC_ONLY);
+int adlak_net_dettach(struct adlak_context *context) {
+    int                      ret = 0;
+    struct adlak_model_attr *pmodel_attr;
+    uint32_t                 i;
+    for (i = 0; i < context->sub_tasks_count; i++) {
+        pmodel_attr = adlak_get_model_attr(context, i);
+        if (pmodel_attr) {
+            AML_LOG_DEBUG("%s", __func__);
+            ret++;
+            /*destroy the private command queue*/
+            adlak_destroy_command_queue_private(pmodel_attr);
         }
-        if (context->smmu_attr.smmu_private) {
-            adlak_mem_destroy_smmu(&context->smmu_attr.smmu_private,
-                                   ADLAK_ENUM_SMMU_TLB_TYPE_PRIVATE_ONLY);
-        }
-
-        adlak_model_destroy(context->pmodel_attr);
-        context->pmodel_attr = NULL;
     }
+    for (i = 0; i < context->sub_tasks_count; i++) {
+        pmodel_attr = adlak_get_model_attr(context, i);
+        if (pmodel_attr) {
+            ret++;
+            if (context->smmu_attr.smmu_public) {
+                adlak_mem_destroy_smmu(&context->smmu_attr.smmu_public,
+                                       ADLAK_ENUM_SMMU_TLB_TYPE_PUBLIC_ONLY);
+            }
+            if (context->smmu_attr.smmu_private) {
+                adlak_mem_destroy_smmu(&context->smmu_attr.smmu_private,
+                                       ADLAK_ENUM_SMMU_TLB_TYPE_PRIVATE_ONLY);
+            }
+
+            adlak_model_destroy(pmodel_attr);
+            adlak_clear_model_attr(context, i);
+#ifdef CONFIG_ADLAK_TEE
+        } else if (context->ptee_model_attr) {
+            ret++;
+            adlak_tee_model_destroy(context->ptee_model_attr);
+            context->ptee_model_attr = NULL;
+#endif
+        }
+    }
+
     return ret;
 }
 
@@ -148,7 +165,7 @@ int adlak_destroy_context(struct adlak_device *padlak, struct adlak_context *con
         AML_LOG_INFO("net [%d] is idle!", net_id);
         adlak_os_mutex_lock(&context->context_mutex);
         adlak_mem_free_all_context(context);
-        adlak_net_dettach_by_id(context, net_id);
+        adlak_net_dettach(context);
 
         adlak_to_umd_sinal_deinit(&context->wait);
 
@@ -294,4 +311,23 @@ int adlak_context_invalid_cache(struct adlak_context *context) {
         }
     }
     return 0;
+}
+
+struct adlak_model_attr *adlak_get_model_attr(struct adlak_context *context,
+                                              uint32_t              sub_tasks_idx) {
+    struct adlak_model_attr *pmodel_attr = NULL;
+    if (context->pmodel_attr_list) {
+        if (sub_tasks_idx < context->sub_tasks_count) {
+            pmodel_attr = context->pmodel_attr_list[sub_tasks_idx];
+        }
+    }
+    return pmodel_attr;
+}
+
+void adlak_clear_model_attr(struct adlak_context *context, uint32_t sub_tasks_idx) {
+    if (context->pmodel_attr_list) {
+        if (sub_tasks_idx < context->sub_tasks_count) {
+            context->pmodel_attr_list[sub_tasks_idx] = NULL;
+        }
+    }
 }

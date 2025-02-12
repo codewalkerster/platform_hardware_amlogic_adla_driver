@@ -172,6 +172,7 @@ int adlak_irq_proc(struct adlak_device *const padlak) {
     struct adlak_hw_stat *      phw_stat     = NULL;
     struct adlak_dev_inference *pinference   = NULL;
     struct adlak_cmq_buffer *   cmq_buf_info = NULL;
+    struct adlak_model_attr *   pmodel_attr  = NULL;
     // adlak_cant_sleep();
     ptask = padlak->queue.ptask_sch_cur;
     if (NULL == ptask) {
@@ -180,8 +181,9 @@ int adlak_irq_proc(struct adlak_device *const padlak) {
     phw_stat   = &ptask->hw_stat;
     pinference = &padlak->queue.dev_inference;
 
-    irqstatus    = adlak_hal_get_irq_status(phw_stat);
-    cmq_buf_info = (struct adlak_cmq_buffer *)ptask->context->pmodel_attr->cmq_buffer;
+    irqstatus                   = adlak_hal_get_irq_status(phw_stat);
+    pmodel_attr                 = adlak_get_model_attr(ptask->context, ptask->sub_tasks_idx);
+    cmq_buf_info                = (struct adlak_cmq_buffer *)pmodel_attr->cmq_buffer;
     cmq_buf_info->cmq_rd_offset = phw_stat->ps_rbf_rpt;
 
     AML_LOG_INFO("IRQ status[0x%08X]", irqstatus->irq_masked);
@@ -192,6 +194,17 @@ int adlak_irq_proc(struct adlak_device *const padlak) {
             adlak_hal_irq_clear(padlak, irqstatus->irq_masked);
             return 0;
         }
+    }
+    if (irqstatus->irq_masked & ADLAK_IRQ_MASK_PM_FIFO_OVF) {
+        AML_LOG_WARN("PM fifo overflow.");
+        adlak_hal_irq_clear(padlak, ADLAK_IRQ_MASK_PM_FIFO_OVF);
+        phw_stat->extra_status = phw_stat->extra_status | ADLAK_EXTRA_STATE_PM_FIFO_OVERFLOW;
+        return 0;
+    } else if (irqstatus->irq_masked & ADLAK_IRQ_MASK_PM_ARBITER_OVF) {
+        AML_LOG_WARN("PM arbiter overflow.");
+        adlak_hal_irq_clear(padlak, ADLAK_IRQ_MASK_PM_ARBITER_OVF);
+        phw_stat->extra_status = phw_stat->extra_status | ADLAK_EXTRA_STATE_PM_FIFO_OVERFLOW;
+        return 0;
     }
 
     if (unlikely(irqstatus->irq_masked == 0)) {

@@ -49,7 +49,7 @@ static void adlak_parser_start(struct io_region *region) {
     AML_LOG_DEBUG("%s", __func__);
     d.all           = 0;
     d.bitc.ps_start = 1;
-    adlak_write32(region, REG_ADLAK_0X50, d.all);
+    adlak_write32(region, REG_ADLAK_PS_CTRL, d.all);
 }
 
 static int adlak_parser_set_wpt(struct io_region *region, uint32_t wpt) {
@@ -61,7 +61,7 @@ static int adlak_parser_set_wpt(struct io_region *region, uint32_t wpt) {
         goto end;
     }
     AML_LOG_INFO("Set CMQ WPT=0x%08X", wpt);
-    adlak_write32(region, REG_ADLAK_0X6C, wpt & 0x0FFFFFFF);
+    adlak_write32(region, REG_ADLAK_PS_RBF_WPT, wpt & 0x0FFFFFFF);
 end:
     return -1;
 }
@@ -78,16 +78,16 @@ void adlak_pm_enable(void *padlak, uint32_t en) {
     if (0 != en) {
         d.bitc.pm_en = 0x03;
     }
-    adlak_write32(region, REG_ADLAK_0XF0, d.all);
+    adlak_write32(region, REG_ADLAK_PM_EN, d.all);
 
-    d_rev.all = adlak_read32(region, REG_ADLAK_0X0);
+    d_rev.all = adlak_read32(region, REG_ADLAK_REV);
     if (d_rev.bitc.major_rev >= 3) {
         /*
             pm_ddr_unit bit[0-1]   00: 16Byte; 01: 32Byte; 10: 64Byte; 11: reserved
             pm_sram_unit bit[2-3]  00: 16Byte; 01: 32Byte; 10: 64Byte; 11: reserved
         */
-        adlak_write32(region, REG_ADLAK_0X108, 0x05);  // 32bit
-        // adlak_write32(region, REG_ADLAK_0X108, 0x00);//16bit
+        adlak_write32(region, REG_ADLAK_PM_UNIT, 0x04);  // 32bit
+        // adlak_write32(region, REG_ADLAK_PM_UNIT, 0x00);//16bit
     }
 }
 
@@ -98,11 +98,11 @@ void adlak_pm_reset(void *padlak) {
     AML_LOG_DEBUG("%s", __func__);
     ASSERT(padlak);
     region          = ((struct adlak_device *)padlak)->hw_res.preg;
-    d.all           = adlak_read32(region, REG_ADLAK_0XF0);
+    d.all           = adlak_read32(region, REG_ADLAK_PM_EN);
     d.bitc.pm_swrst = 1;
-    adlak_write32(region, REG_ADLAK_0XF0, d.all);
+    adlak_write32(region, REG_ADLAK_PM_EN, d.all);
     d.bitc.pm_swrst = 0;
-    adlak_write32(region, REG_ADLAK_0XF0, d.all);
+    adlak_write32(region, REG_ADLAK_PM_EN, d.all);
 }
 
 void adlak_pm_config(void *padlak, uint32_t addr, uint32_t buf_size, uint32_t wpt) {
@@ -110,10 +110,10 @@ void adlak_pm_config(void *padlak, uint32_t addr, uint32_t buf_size, uint32_t wp
     AML_LOG_DEBUG("%s", __func__);
     ASSERT(padlak);
     region = ((struct adlak_device *)padlak)->hw_res.preg;
-    adlak_write32(region, REG_ADLAK_0XF4, addr);
-    adlak_write32(region, REG_ADLAK_0XF8, buf_size);
-    adlak_write32(region, REG_ADLAK_0XFC, wpt);
-    adlak_write32(region, REG_ADLAK_0X100, 0);
+    adlak_write32(region, REG_ADLAK_PM_RBF_BASE, addr);
+    adlak_write32(region, REG_ADLAK_PM_RBF_SIZE, buf_size);
+    adlak_write32(region, REG_ADLAK_PM_RBF_WPT, wpt);
+    adlak_write32(region, REG_ADLAK_PM_RBF_RPT, 0);
 }
 
 uint32_t adlak_pm_get_stat(void *padlak) {
@@ -122,7 +122,7 @@ uint32_t adlak_pm_get_stat(void *padlak) {
     AML_LOG_DEBUG("%s", __func__);
     ASSERT(padlak);
     region = ((struct adlak_device *)padlak)->hw_res.preg;
-    val    = adlak_read32(region, REG_ADLAK_0XFC);
+    val    = adlak_read32(region, REG_ADLAK_PM_RBF_WPT);
 
     return val;
 }
@@ -138,12 +138,12 @@ int adlak_pm_fush_until_empty(void *padlak) {
     // flush pm
     d.all           = 0;
     d.bitc.pm_flush = 1;
-    adlak_write32(region, REG_ADLAK_0X104, d.all);
+    adlak_write32(region, REG_ADLAK_PM_STS, d.all);
 
     /*2. Wait until pm empty*/
     cnt = 0;
     do {
-        d.all = adlak_read32(region, REG_ADLAK_0X104);
+        d.all = adlak_read32(region, REG_ADLAK_PM_STS);
         cnt++;
         if (cnt > 3000) {
             AML_LOG_WARN("wait pm empty timeout!");
@@ -169,10 +169,10 @@ static int adlak_hal_soft_reset(void *data) {
     region = padlak->hw_res.preg;
 
     /*1. Stop the memory access*/
-    d_ab.all = adlak_read32(region, REG_ADLAK_0XA0);
+    d_ab.all = adlak_read32(region, REG_ADLAK_AB_CTL);
 
     d_ab.bitc.ab_force_stop_en = 1;
-    adlak_write32(region, REG_ADLAK_0XA0, d_ab.all);
+    adlak_write32(region, REG_ADLAK_AB_CTL, d_ab.all);
 
     /*2. Wait until memory access complete*/
     cnt = 0;
@@ -180,7 +180,7 @@ static int adlak_hal_soft_reset(void *data) {
 #if CONFIG_ADLAK_EMU_EN
         break;
 #endif
-        d_ab.all = adlak_read32(region, REG_ADLAK_0XA0);
+        d_ab.all = adlak_read32(region, REG_ADLAK_AB_CTL);
         if (1 == d_ab.bitc.ab_force_stop_idle) {
             break;
         }
@@ -194,17 +194,17 @@ static int adlak_hal_soft_reset(void *data) {
     };
 
     /*3. Release the memory access*/
-    d_ab.all                     = adlak_read32(region, REG_ADLAK_0XA0);
+    d_ab.all                     = adlak_read32(region, REG_ADLAK_AB_CTL);
     d_ab.bitc.ab_force_stop_en   = 0;
     d_ab.bitc.ab_force_stop_idle = 0;
-    adlak_write32(region, REG_ADLAK_0XA0, d_ab.all);
+    adlak_write32(region, REG_ADLAK_AB_CTL, d_ab.all);
 
     /*4. Reset adlak*/
     d.bitc.adlak_swrst = 1;
-    adlak_write32(region, REG_ADLAK_0X20, d.all);
+    adlak_write32(region, REG_ADLAK_SWRST, d.all);
 
     d.bitc.adlak_swrst = 0;
-    adlak_write32(region, REG_ADLAK_0X20, d.all);
+    adlak_write32(region, REG_ADLAK_SWRST, d.all);
     return 0;
 }
 
@@ -245,14 +245,14 @@ int adlak_hal_set_mmu(void *data, bool enable, uint64_t smmu_entry) {
     } else {
         d.bitc.smmu_en = false;
     }
-    adlak_write32(region, REG_ADLAK_0XC0, d.all);
+    adlak_write32(region, REG_ADLAK_SMMU_EN, d.all);
 
     if (enable) {
         AML_LOG_INFO("SMMU Enable, and set smmu_entry addr=0x%lX", (uintptr_t)smmu_entry);
         smmu_entry = ((smmu_entry >> 5) << 12);
 
-        adlak_write32(region, REG_ADLAK_0XC4, (uint32_t)(smmu_entry & (0xFFFFFFFF)));
-        adlak_write32(region, REG_ADLAK_0XC8, (uint32_t)((smmu_entry >> 32) & (0xFFFFFFFF)));
+        adlak_write32(region, REG_ADLAK_SMMU_TTBR_L, (uint32_t)(smmu_entry & (0xFFFFFFFF)));
+        adlak_write32(region, REG_ADLAK_SMMU_TTBR_H, (uint32_t)((smmu_entry >> 32) & (0xFFFFFFFF)));
         adlak_hal_smmu_cache_invalid(data, 0);
     } else {
         AML_LOG_INFO("SMMU Disable");
@@ -261,8 +261,7 @@ int adlak_hal_set_mmu(void *data, bool enable, uint64_t smmu_entry) {
     return 0;
 }
 void adlak_hal_smmu_cache_invalid(void *data, dma_addr_t iova) {
-    struct adlak_device *padlak = (struct adlak_device *)data;
-    // struct adlak_hw_info *   phw_info = (struct adlak_hw_info *)padlak->hw_info;
+    struct adlak_device *    padlak = (struct adlak_device *)data;
     struct io_region *       region = padlak->hw_res.preg;
     HAL_ADLAK_SMMU_INV_CTL_S d;
     uint32_t                 cnt;
@@ -278,13 +277,13 @@ void adlak_hal_smmu_cache_invalid(void *data, dma_addr_t iova) {
         d.bitc.smmu_invalid_rdy = 1;
         d.bitc.smmu_invalid_one = 0x0B;
     }
-    adlak_write32(region, REG_ADLAK_0XD8, (uint32_t)iova);
-    adlak_write32(region, REG_ADLAK_0XD4, (uint32_t)d.all);
+    adlak_write32(region, REG_ADLAK_SMMU_INV_VA, (uint32_t)iova);
+    adlak_write32(region, REG_ADLAK_SMMU_INV_CTL, (uint32_t)d.all);
 
     /*2. Wait until smmu_invalid complete*/
     cnt = 0;
     do {
-        d.all = adlak_read32(region, REG_ADLAK_0XD4);
+        d.all = adlak_read32(region, REG_ADLAK_SMMU_INV_CTL);
         cnt++;
         if (cnt > 3000) {
             AML_LOG_ERR("wait smmu_invalid_rdy timeout!");
@@ -303,13 +302,13 @@ void adlak_parser_set_pend_timer(struct io_region *region, uint32_t time) {
     if (time) {
         d.bitc.ps_pend_timer_en = 1;
     }
-    adlak_write32(region, REG_ADLAK_0X84, d.all);
-    adlak_write32(region, REG_ADLAK_0X88, time);
+    adlak_write32(region, REG_ADLAK_PS_PEND_VAL, time);
+    adlak_write32(region, REG_ADLAK_PS_PEND_EN, d.all);
 }
 void adlak_parser_set_apb_timeout(struct io_region *region, uint32_t time) {
     // HAL_ADLAK_PS_PEND_EN_S d;
     AML_LOG_DEBUG("%s", __func__);
-    adlak_write32(region, REG_ADLAK_0X4, time);
+    adlak_write32(region, REG_ADLAK_WAIT_TIMER, time);
 }
 
 void adlak_hal_enable(void *data, uint32_t en) {
@@ -325,7 +324,7 @@ void adlak_hal_enable(void *data, uint32_t en) {
     if (en) {
         d.bitc.adlak_en = 1;
     }
-    adlak_write32(padlak->hw_res.preg, REG_ADLAK_0X24, d.all);
+    adlak_write32(padlak->hw_res.preg, REG_ADLAK_ADLAK_EN, d.all);
 }
 
 void adlak_hal_irq_enable(void *data, uint32_t en) {
@@ -334,20 +333,19 @@ void adlak_hal_irq_enable(void *data, uint32_t en) {
     AML_LOG_DEBUG("%s", __func__);
 
     if (!en) {
-        adlak_write32(padlak->hw_res.preg, REG_ADLAK_0X18, phw_info->irq_cfg.mask);
-        adlak_write32(padlak->hw_res.preg, REG_ADLAK_0X14, 0);
+        adlak_write32(padlak->hw_res.preg, REG_ADLAK_IRQ_RAW, phw_info->irq_cfg.mask);
+        adlak_write32(padlak->hw_res.preg, REG_ADLAK_IRQ_MASK, 0);
     } else {
-        adlak_write32(padlak->hw_res.preg, REG_ADLAK_0X18, 0xFFFF);  // irq clear
-        adlak_write32(padlak->hw_res.preg, REG_ADLAK_0X14, phw_info->irq_cfg.mask);
+        adlak_write32(padlak->hw_res.preg, REG_ADLAK_IRQ_RAW, 0xFFFF);  // irq clear
+        adlak_write32(padlak->hw_res.preg, REG_ADLAK_IRQ_MASK, phw_info->irq_cfg.mask);
     }
 }
 
 void adlak_hal_irq_clear(void *data, uint32_t clr_bits) {
     struct adlak_device *padlak = (struct adlak_device *)data;
-    // struct adlak_hw_info *phw_info = (struct adlak_hw_info *)padlak->hw_info;
     AML_LOG_DEBUG("%s", __func__);
 
-    adlak_write32(padlak->hw_res.preg, REG_ADLAK_0X18,
+    adlak_write32(padlak->hw_res.preg, REG_ADLAK_IRQ_RAW,
                   clr_bits & ((ADLAK_IRQ_MASK_INVALID_IOVA << 1) - 1));
 }
 
@@ -357,7 +355,7 @@ static void adlak_hal_get_revision(void *data) {
     struct io_region *    region   = padlak->hw_res.preg;
     HAL_ADLAK_REV_S       d;
     AML_LOG_DEBUG("%s", __func__);
-    d.all                    = adlak_read32(region, REG_ADLAK_0X0);
+    d.all                    = adlak_read32(region, REG_ADLAK_REV);
     phw_info->rev.bitc.major = d.bitc.major_rev;
     phw_info->rev.bitc.minor = d.bitc.minor_rev;
     AML_LOG_INFO("ADLAK HW Revision:%d.%d", phw_info->rev.bitc.major, phw_info->rev.bitc.minor);
@@ -395,23 +393,23 @@ uint32_t adlak_get_hw_status(struct adlak_hw_stat *phw_stat) {
     ASSERT(phw_stat);
     region = phw_stat->hw_info->region;
 #if ADLAK_DEBUG
-    phw_stat->ps_err_dat     = adlak_read32(region, REG_ADLAK_0X58);
-    phw_stat->ps_finish_id   = adlak_read32(region, REG_ADLAK_0X78);
-    phw_stat->ps_status      = adlak_read32(region, REG_ADLAK_0X54);
-    phw_stat->ps_idle_status = adlak_read32(region, REG_ADLAK_0X5C);
+    phw_stat->ps_err_dat     = adlak_read32(region, REG_ADLAK_PS_ERR_DAT);
+    phw_stat->ps_finish_id   = adlak_read32(region, REG_ADLAK_PS_FINISH_ID);
+    phw_stat->ps_status      = adlak_read32(region, REG_ADLAK_PS_STS);
+    phw_stat->ps_idle_status = adlak_read32(region, REG_ADLAK_PS_IDLE_STS);
 
-    phw_stat->ps_rbf_base    = adlak_read32(region, REG_ADLAK_0X64);
-    phw_stat->ps_rbf_size    = adlak_read32(region, REG_ADLAK_0X68);
-    phw_stat->ps_dbg_id      = adlak_read32(region, REG_ADLAK_0X90);
-    phw_stat->ps_module_stat = adlak_read32(region, REG_ADLAK_0X8C);
+    phw_stat->ps_rbf_base    = adlak_read32(region, REG_ADLAK_PS_RBF_BASE);
+    phw_stat->ps_rbf_size    = adlak_read32(region, REG_ADLAK_PS_RBF_SIZE);
+    phw_stat->ps_dbg_id      = adlak_read32(region, REG_ADLAK_PS_DBG_SW_ID);
+    phw_stat->ps_module_stat = adlak_read32(region, REG_ADLAK_PS_MODULE_IDLE_STS);
 #endif
-    phw_stat->ps_rbf_wpt = adlak_read32(region, REG_ADLAK_0X6C);
-    phw_stat->ps_rbf_rpt = adlak_read32(region, REG_ADLAK_0X70);
-    phw_stat->ps_rbf_ppt = adlak_read32(region, REG_ADLAK_0X74);
+    phw_stat->ps_rbf_wpt = adlak_read32(region, REG_ADLAK_PS_RBF_WPT);
+    phw_stat->ps_rbf_rpt = adlak_read32(region, REG_ADLAK_PS_RBF_RPT);
+    phw_stat->ps_rbf_ppt = adlak_read32(region, REG_ADLAK_PS_RBF_PPT);
     if (phw_stat->ps_status & ADLAK_IRQ_MASK_INVALID_IOVA) {
-        phw_stat->smmu_err_dft_pa = adlak_read32(region, REG_ADLAK_0XDC);
-        phw_stat->smmu_err_mdl_id = adlak_read32(region, REG_ADLAK_0XE0);
-        phw_stat->smmu_err_iova   = adlak_read32(region, REG_ADLAK_0XE4);
+        phw_stat->smmu_err_dft_pa = adlak_read32(region, REG_ADLAK_SMMU_DFT);
+        phw_stat->smmu_err_mdl_id = adlak_read32(region, REG_ADLAK_SMMU_IVD_MDL);
+        phw_stat->smmu_err_iova   = adlak_read32(region, REG_ADLAK_SMMU_IVD_VA);
     }
 
     if ((phw_stat->hw_info->irq_cfg.mask_err | ADLAK_IRQ_MASK_SW_TIMEOUT) &
@@ -427,41 +425,41 @@ struct adlak_irq_status *adlak_hal_get_irq_status(struct adlak_hw_stat *phw_stat
     AML_LOG_DEBUG("%s", __func__);
     ASSERT(phw_stat);
     region                          = phw_stat->hw_info->region;
-    phw_stat->irq_status.irq_masked = adlak_read32(region, REG_ADLAK_0X10);
-    phw_stat->irq_status.irq_raw    = adlak_read32(region, REG_ADLAK_0X18);
+    phw_stat->irq_status.irq_masked = adlak_read32(region, REG_ADLAK_IRQ_MASKED);
+    phw_stat->irq_status.irq_raw    = adlak_read32(region, REG_ADLAK_IRQ_RAW);
     if (true == phw_stat->irq_status.timeout) {
         phw_stat->irq_status.irq_masked |= ADLAK_IRQ_MASK_SW_TIMEOUT;
     }
-    phw_stat->irq_status.time_stamp    = adlak_read32(region, REG_ADLAK_0X60);
-    phw_stat->irq_status.status_report = adlak_read32(region, REG_ADLAK_0X1C);
+    phw_stat->irq_status.time_stamp    = adlak_read32(region, REG_ADLAK_PS_TIME_STAMP);
+    phw_stat->irq_status.status_report = adlak_read32(region, REG_ADLAK_STS_REPORT);
 
-    phw_stat->ps_rbf_rpt = adlak_read32(region, REG_ADLAK_0X70);
+    phw_stat->ps_rbf_rpt = adlak_read32(region, REG_ADLAK_PS_RBF_RPT);
 
     return &phw_stat->irq_status;
 }
 
 void adlak_status_dump(struct adlak_hw_stat *phw_stat) {
     AML_LOG_DEBUG("%s", __func__);
-    AML_LOG_DEBUG("REG_ADLAK_0X10   : 0x%08X", phw_stat->irq_status.irq_masked);
-    AML_LOG_DEBUG("REG_ADLAK_0X18      : 0x%08X", phw_stat->irq_status.irq_raw);
-    AML_LOG_DEBUG("REG_ADLAK_0X1C   : 0x%08X", phw_stat->irq_status.status_report);
-    AML_LOG_DEBUG("REG_ADLAK_0X58   : 0x%08X", phw_stat->ps_err_dat);
-    AML_LOG_DEBUG("REG_ADLAK_0X78 : 0x%08X", phw_stat->ps_finish_id);
-    AML_LOG_DEBUG("REG_ADLAK_0X54       : 0x%08X", phw_stat->ps_status);
-    AML_LOG_DEBUG("REG_ADLAK_0X60: 0x%08X", phw_stat->irq_status.time_stamp);
-    AML_LOG_DEBUG("REG_ADLAK_0X5C  : 0x%08X", phw_stat->ps_idle_status);
-    AML_LOG_DEBUG("REG_ADLAK_0X90 : 0x%08X", phw_stat->ps_dbg_id);
-    AML_LOG_DEBUG("REG_ADLAK_0X8C  : 0x%08X", phw_stat->ps_module_stat);
+    AML_LOG_DEBUG("REG_ADLAK_IRQ_MASKED   : 0x%08X", phw_stat->irq_status.irq_masked);
+    AML_LOG_DEBUG("REG_ADLAK_IRQ_RAW      : 0x%08X", phw_stat->irq_status.irq_raw);
+    AML_LOG_DEBUG("REG_ADLAK_STS_REPORT   : 0x%08X", phw_stat->irq_status.status_report);
+    AML_LOG_DEBUG("REG_ADLAK_PS_ERR_DAT   : 0x%08X", phw_stat->ps_err_dat);
+    AML_LOG_DEBUG("REG_ADLAK_PS_FINISH_ID : 0x%08X", phw_stat->ps_finish_id);
+    AML_LOG_DEBUG("REG_ADLAK_PS_STS       : 0x%08X", phw_stat->ps_status);
+    AML_LOG_DEBUG("REG_ADLAK_PS_TIME_STAMP: 0x%08X", phw_stat->irq_status.time_stamp);
+    AML_LOG_DEBUG("REG_ADLAK_PS_IDLE_STS  : 0x%08X", phw_stat->ps_idle_status);
+    AML_LOG_DEBUG("REG_ADLAK_PS_DBG_SW_ID : 0x%08X", phw_stat->ps_dbg_id);
+    AML_LOG_DEBUG("REG_ADLAK_PS_MODULE_IDLE_STS  : 0x%08X", phw_stat->ps_module_stat);
     if (phw_stat->ps_status & ADLAK_IRQ_MASK_INVALID_IOVA) {
-        AML_LOG_DEBUG("REG_ADLAK_0XDC     : 0x%08X", phw_stat->smmu_err_dft_pa);
-        AML_LOG_DEBUG("REG_ADLAK_0XE0 : 0x%08X", phw_stat->smmu_err_mdl_id);
-        AML_LOG_DEBUG("REG_ADLAK_0XE4  : 0x%08X", phw_stat->smmu_err_iova);
+        AML_LOG_DEBUG("REG_ADLAK_SMMU_DFT     : 0x%08X", phw_stat->smmu_err_dft_pa);
+        AML_LOG_DEBUG("REG_ADLAK_SMMU_IVD_MDL : 0x%08X", phw_stat->smmu_err_mdl_id);
+        AML_LOG_DEBUG("REG_ADLAK_SMMU_IVD_VA  : 0x%08X", phw_stat->smmu_err_iova);
     }
-    AML_LOG_DEBUG("REG_ADLAK_0X64  : 0x%08X", phw_stat->ps_rbf_base);
-    AML_LOG_DEBUG("REG_ADLAK_0X68  : 0x%08X", phw_stat->ps_rbf_size);
-    AML_LOG_DEBUG("REG_ADLAK_0X6C   : 0x%08X", phw_stat->ps_rbf_wpt);
-    AML_LOG_DEBUG("REG_ADLAK_0X70   : 0x%08X", phw_stat->ps_rbf_rpt);
-    AML_LOG_DEBUG("REG_ADLAK_0X74   : 0x%08X", phw_stat->ps_rbf_ppt);
+    AML_LOG_DEBUG("REG_ADLAK_PS_RBF_BASE  : 0x%08X", phw_stat->ps_rbf_base);
+    AML_LOG_DEBUG("REG_ADLAK_PS_RBF_SIZE  : 0x%08X", phw_stat->ps_rbf_size);
+    AML_LOG_DEBUG("REG_ADLAK_PS_RBF_WPT   : 0x%08X", phw_stat->ps_rbf_wpt);
+    AML_LOG_DEBUG("REG_ADLAK_PS_RBF_RPT   : 0x%08X", phw_stat->ps_rbf_rpt);
+    AML_LOG_DEBUG("REG_ADLAK_PS_RBF_PPT   : 0x%08X", phw_stat->ps_rbf_ppt);
 
     if ((phw_stat->hw_info->irq_cfg.mask_err | ADLAK_IRQ_MASK_SW_TIMEOUT) &
         phw_stat->irq_status.irq_masked) {
@@ -475,7 +473,7 @@ uint32_t adlak_hal_get_ps_rpt(void *data) {
     return padlak->cmq_buffer_public.cmq_rd_offset;
 
 #endif
-    return adlak_hal_get_reg(data, REG_ADLAK_0X70);
+    return adlak_hal_get_reg(data, REG_ADLAK_PS_RBF_RPT);
 }
 
 int adlak_hal_set_axisram(void *data) {
@@ -497,12 +495,12 @@ int adlak_hal_set_axisram(void *data) {
             va_end += va_end - va_start;
         }
         AML_LOG_INFO("va_start = 0x%lx,va_end = 0x%lX", (uintptr_t)va_start, (uintptr_t)va_end);
-        adlak_write32(region, REG_ADLAK_0XA4, va_start / 4096);
-        adlak_write32(region, REG_ADLAK_0XA8, va_end / 4096);
-        adlak_write32(region, REG_ADLAK_0X9C, pa_start / 4096);
-        d_ab.all                      = adlak_read32(region, REG_ADLAK_0XA0);
+        adlak_write32(region, REG_ADLAK_AB_AXI_SADDR, va_start / 4096);
+        adlak_write32(region, REG_ADLAK_AB_AXI_EADDR, va_end / 4096);
+        adlak_write32(region, REG_ADLAK_AB_AXI_PADDR, pa_start / 4096);
+        d_ab.all                      = adlak_read32(region, REG_ADLAK_AB_CTL);
         d_ab.bitc.ab_axi_addr_wrap_en = wrap_en;
-        adlak_write32(region, REG_ADLAK_0XA0, d_ab.all);
+        adlak_write32(region, REG_ADLAK_AB_CTL, d_ab.all);
     }
     return 0;
 }
@@ -513,12 +511,12 @@ static int adlak_hal_set_autoclock(void *data, uint32_t en) {
 
     AML_LOG_DEBUG("%s", __func__);
     if (0 == en) {
-        adlak_write32(region, REG_ADLAK_0X28, 0x0);
-        adlak_write32(region, REG_ADLAK_0X120, 0x0);
+        adlak_write32(region, REG_ADLAK_CLK_AUTOCLK, 0x0);
+        adlak_write32(region, REG_ADLAK_MC_CTL, 0x0);
     } else {
-        adlak_write32(region, REG_ADLAK_0X28, 0xFFFF);
-        adlak_write32(region, REG_ADLAK_0X120, 0xDF);
-        adlak_write32(region, REG_ADLAK_0X2C, 0x0508);
+        adlak_write32(region, REG_ADLAK_CLK_AUTOCLK, 0xFFFF);
+        adlak_write32(region, REG_ADLAK_MC_CTL, 0xDF);
+        adlak_write32(region, REG_ADLAK_CLK_IDLE_CNT, 0x0508);
     }
     return 0;
 }
@@ -568,16 +566,15 @@ int adlak_hal_stop(void *data) {
 }
 
 int adlak_hal_reset_and_start(void *data) {
-    int                   ret    = ERR(NONE);
-    struct adlak_device * padlak = (struct adlak_device *)data;
-    struct adlak_hw_info *phw_info;
+    int                  ret    = ERR(NONE);
+    struct adlak_device *padlak = (struct adlak_device *)data;
 
     AML_LOG_DEBUG("%s", __func__);
-    phw_info = padlak->hw_info;
     /*1. hardware reset */
     adlak_hal_reset(padlak);
 
     /*2. hardware start*/
+    adlak_hal_enable(padlak, true);  // alda enable
     adlak_hal_start(padlak);
 #if ADLAK_DEBUG
     g_adlak_log_level = g_adlak_log_level_pre;
@@ -586,150 +583,150 @@ int adlak_hal_reset_and_start(void *data) {
 }
 int adlak_get_reg_name(int offset, char *buf, size_t buf_size) {
     switch (offset) {
-        case REG_ADLAK_0X0:
+        case REG_ADLAK_REV:
             return adlak_os_snprintf(buf, buf_size, "%s", "REV");
 
-        case REG_ADLAK_0X4:
+        case REG_ADLAK_WAIT_TIMER:
             return adlak_os_snprintf(buf, buf_size, "%s", "WAIT_TIMER");
         case REG_ADLAK_SECURITY:
             return adlak_os_snprintf(buf, buf_size, "%s", "SECURITY");
         // irq
-        case REG_ADLAK_0X10:
+        case REG_ADLAK_IRQ_MASKED:
             return adlak_os_snprintf(buf, buf_size, "%s", "IRQ_MASKED");
-        case REG_ADLAK_0X14:
+        case REG_ADLAK_IRQ_MASK:
             return adlak_os_snprintf(buf, buf_size, "%s", "IRQ_MASK");
-        case REG_ADLAK_0X18:
+        case REG_ADLAK_IRQ_RAW:
             return adlak_os_snprintf(buf, buf_size, "%s", "IRQ_RAW");
-        case REG_ADLAK_0X1C:
+        case REG_ADLAK_STS_REPORT:
             return adlak_os_snprintf(buf, buf_size, "%s", "STS_REPORT");
         // power&clock
-        case REG_ADLAK_0X20:
+        case REG_ADLAK_SWRST:
             return adlak_os_snprintf(buf, buf_size, "%s", "SWRST");
-        case REG_ADLAK_0X24:
+        case REG_ADLAK_ADLAK_EN:
             return adlak_os_snprintf(buf, buf_size, "%s", "ADLAK_EN");
-        case REG_ADLAK_0X28:
+        case REG_ADLAK_CLK_AUTOCLK:
             return adlak_os_snprintf(buf, buf_size, "%s", "CLK_AUTOCLK");
-        case REG_ADLAK_0X2C:
+        case REG_ADLAK_CLK_IDLE_CNT:
             return adlak_os_snprintf(buf, buf_size, "%s", "CLK_IDLE_CNT");
         // debug
-        case REG_ADLAK_0X30:
+        case REG_ADLAK_DBG_EN:
             return adlak_os_snprintf(buf, buf_size, "%s", "DBG_EN");
-        case REG_ADLAK_0X34:
+        case REG_ADLAK_DBG_SEL:
             return adlak_os_snprintf(buf, buf_size, "%s", "DBG_SEL");
-        case REG_ADLAK_0X38:
+        case REG_ADLAK_DBG_SUB_SEL:
             return adlak_os_snprintf(buf, buf_size, "%s", "DBG_SUB_SEL");
-        case REG_ADLAK_0X3C:
+        case REG_ADLAK_DBG_DAT:
             return adlak_os_snprintf(buf, buf_size, "%s", "DBG_DAT");
-        case REG_ADLAK_0X40:
+        case REG_ADLAK_DBG_SRAM_CTRL:
             return adlak_os_snprintf(buf, buf_size, "%s", "DBG_SRAM_CTRL");
-        case REG_ADLAK_0X44:
+        case REG_ADLAK_DBG_SRAM_ADDR:
             return adlak_os_snprintf(buf, buf_size, "%s", "DBG_SRAM_ADDR");
-        case REG_ADLAK_0X48:
+        case REG_ADLAK_DBG_SRAM_WDAT:
             return adlak_os_snprintf(buf, buf_size, "%s", "DBG_SRAM_WDAT");
-        case REG_ADLAK_0X4C:
+        case REG_ADLAK_DBG_SRAM_RDAT:
             return adlak_os_snprintf(buf, buf_size, "%s", "DBG_SRAM_RDAT");
 
         // parser
-        case REG_ADLAK_0X50:
+        case REG_ADLAK_PS_CTRL:
             return adlak_os_snprintf(buf, buf_size, "%s", "PS_CTRL");
-        case REG_ADLAK_0X54:
+        case REG_ADLAK_PS_STS:
             return adlak_os_snprintf(buf, buf_size, "%s", "PS_STS");
-        case REG_ADLAK_0X58:
+        case REG_ADLAK_PS_ERR_DAT:
             return adlak_os_snprintf(buf, buf_size, "%s", "PS_ERR_DAT");
-        case REG_ADLAK_0X5C:
+        case REG_ADLAK_PS_IDLE_STS:
             return adlak_os_snprintf(buf, buf_size, "%s", "PS_IDLE_STS");
-        case REG_ADLAK_0X60:
+        case REG_ADLAK_PS_TIME_STAMP:
             return adlak_os_snprintf(buf, buf_size, "%s", "PS_TIME_STAMP");
-        case REG_ADLAK_0X64:
+        case REG_ADLAK_PS_RBF_BASE:
             return adlak_os_snprintf(buf, buf_size, "%s", "PS_RBF_BASE");
-        case REG_ADLAK_0X68:
+        case REG_ADLAK_PS_RBF_SIZE:
             return adlak_os_snprintf(buf, buf_size, "%s", "PS_RBF_SIZE");
-        case REG_ADLAK_0X6C:
+        case REG_ADLAK_PS_RBF_WPT:
             return adlak_os_snprintf(buf, buf_size, "%s", "PS_RBF_WPT");
-        case REG_ADLAK_0X70:
+        case REG_ADLAK_PS_RBF_RPT:
             return adlak_os_snprintf(buf, buf_size, "%s", "PS_RBF_RPT");
-        case REG_ADLAK_0X74:
+        case REG_ADLAK_PS_RBF_PPT:
             return adlak_os_snprintf(buf, buf_size, "%s", "PS_RBF_PPT");
-        case REG_ADLAK_0X78:
+        case REG_ADLAK_PS_FINISH_ID:
             return adlak_os_snprintf(buf, buf_size, "%s", "PS_FINISH_ID");
-        case REG_ADLAK_0X7C:
+        case REG_ADLAK_PS_HCNT:
             return adlak_os_snprintf(buf, buf_size, "%s", "PS_HCNT");
-        case REG_ADLAK_0X80:
+        case REG_ADLAK_PS_OST:
             return adlak_os_snprintf(buf, buf_size, "%s", "PS_OST");
-        case REG_ADLAK_0X84:
+        case REG_ADLAK_PS_PEND_EN:
             return adlak_os_snprintf(buf, buf_size, "%s", "PS_PEND_EN");
-        case REG_ADLAK_0X88:
+        case REG_ADLAK_PS_PEND_VAL:
             return adlak_os_snprintf(buf, buf_size, "%s", "PS_PEND_VAL");
-        case REG_ADLAK_0X8C:
+        case REG_ADLAK_PS_MODULE_IDLE_STS:
             return adlak_os_snprintf(buf, buf_size, "%s", "PS_MODULE_IDLE_STS");
-        case REG_ADLAK_0X90:
+        case REG_ADLAK_PS_DBG_SW_ID:
             return adlak_os_snprintf(buf, buf_size, "%s", "PS_DBG_SW_ID");
-        case REG_ADLAK_0X9C:
+        case REG_ADLAK_AB_AXI_PADDR:
             return adlak_os_snprintf(buf, buf_size, "%s", "AB_AXI_PADDR");
-        case REG_ADLAK_0XA0:
+        case REG_ADLAK_AB_CTL:
             return adlak_os_snprintf(buf, buf_size, "%s", "AB_CTL");
-        case REG_ADLAK_0XA4:
+        case REG_ADLAK_AB_AXI_SADDR:
             return adlak_os_snprintf(buf, buf_size, "%s", "AB_AXI_SADDR");
-        case REG_ADLAK_0XA8:
+        case REG_ADLAK_AB_AXI_EADDR:
             return adlak_os_snprintf(buf, buf_size, "%s", "AB_AXI_EADDR");
-        case REG_ADLAK_0XAC:
+        case REG_ADLAK_AB_R_CS_PRIO:
             return adlak_os_snprintf(buf, buf_size, "%s", "AB_R_CS_PRIO");
-        case REG_ADLAK_0XB0:
+        case REG_ADLAK_AB_R_LS_PRIO:
             return adlak_os_snprintf(buf, buf_size, "%s", "AB_R_LS_PRIO");
-        case REG_ADLAK_0XB4:
+        case REG_ADLAK_AB_R_L2_PRIO:
             return adlak_os_snprintf(buf, buf_size, "%s", "AB_R_L2_PRIO");
-        case REG_ADLAK_0XB8:
+        case REG_ADLAK_AB_W_PRIO:
             return adlak_os_snprintf(buf, buf_size, "%s", "AB_W_PRIO");
-        case REG_ADLAK_0XBC:
+        case REG_ADLAK_AB_AXI_USER:
             return adlak_os_snprintf(buf, buf_size, "%s", "AB_AXI_USER");
         // smmu
-        case REG_ADLAK_0XC0:
+        case REG_ADLAK_SMMU_EN:
             return adlak_os_snprintf(buf, buf_size, "%s", "SMMU_EN");
-        case REG_ADLAK_0XC4:
+        case REG_ADLAK_SMMU_TTBR_L:
             return adlak_os_snprintf(buf, buf_size, "%s", "SMMU_TTBR_L");
-        case REG_ADLAK_0XC8:
+        case REG_ADLAK_SMMU_TTBR_H:
             return adlak_os_snprintf(buf, buf_size, "%s", "SMMU_TTBR_H");
-        case REG_ADLAK_0XCC:
+        case REG_ADLAK_SMMU_PRIO_POW2_0:
             return adlak_os_snprintf(buf, buf_size, "%s", "SMMU_PRIO_POW2_0");
-        case REG_ADLAK_0XD0:
+        case REG_ADLAK_SMMU_PRIO_POW2_1:
             return adlak_os_snprintf(buf, buf_size, "%s", "SMMU_PRIO_POW2_1");
-        case REG_ADLAK_0XD4:
+        case REG_ADLAK_SMMU_INV_CTL:
             return adlak_os_snprintf(buf, buf_size, "%s", "SMMU_INV_CTL");
-        case REG_ADLAK_0XD8:
+        case REG_ADLAK_SMMU_INV_VA:
             return adlak_os_snprintf(buf, buf_size, "%s", "SMMU_INV_VA");
-        case REG_ADLAK_0XDC:
+        case REG_ADLAK_SMMU_DFT:
             return adlak_os_snprintf(buf, buf_size, "%s", "SMMU_DFT");
-        case REG_ADLAK_0XE0:
+        case REG_ADLAK_SMMU_IVD_MDL:
             return adlak_os_snprintf(buf, buf_size, "%s", "SMMU_IVD_MDL");
-        case REG_ADLAK_0XE4:
+        case REG_ADLAK_SMMU_IVD_VA:
             return adlak_os_snprintf(buf, buf_size, "%s", "SMMU_IVD_VA");
         // pm
-        case REG_ADLAK_0XF0:
+        case REG_ADLAK_PM_EN:
             return adlak_os_snprintf(buf, buf_size, "%s", "PM_EN");
-        case REG_ADLAK_0XF4:
+        case REG_ADLAK_PM_RBF_BASE:
             return adlak_os_snprintf(buf, buf_size, "%s", "PM_RBF_BASE");
-        case REG_ADLAK_0XF8:
+        case REG_ADLAK_PM_RBF_SIZE:
             return adlak_os_snprintf(buf, buf_size, "%s", "PM_RBF_SIZE");
-        case REG_ADLAK_0XFC:
+        case REG_ADLAK_PM_RBF_WPT:
             return adlak_os_snprintf(buf, buf_size, "%s", "PM_RBF_WPT");
-        case REG_ADLAK_0X100:
+        case REG_ADLAK_PM_RBF_RPT:
             return adlak_os_snprintf(buf, buf_size, "%s", "PM_RBF_RPT");
-        case REG_ADLAK_0X104:
+        case REG_ADLAK_PM_STS:
             return adlak_os_snprintf(buf, buf_size, "%s", "PM_STS");
-        case REG_ADLAK_0X108:
+        case REG_ADLAK_PM_UNIT:
             return adlak_os_snprintf(buf, buf_size, "%s", "PM_UNIT");
         // AXI DRAM
-        case REG_ADLAK_0X110:
+        case REG_ADLAK_AXIBRG_DX_CTL:
             return adlak_os_snprintf(buf, buf_size, "%s", "AXIBRG_DX_CTL");
-        case REG_ADLAK_0X114:
+        case REG_ADLAK_AXIBRG_DX_HOLD:
             return adlak_os_snprintf(buf, buf_size, "%s", "AXIBRG_DX_HOLD");
         // AXI SRAM
-        case REG_ADLAK_0X118:
+        case REG_ADLAK_AXIBRG_SX_CTL:
             return adlak_os_snprintf(buf, buf_size, "%s", "AXIBRG_SX_CTL");
-        case REG_ADLAK_0X11C:
+        case REG_ADLAK_AXIBRG_SX_HOLD:
             return adlak_os_snprintf(buf, buf_size, "%s", "AXIBRG_SX_HOLD");
 
-        case REG_ADLAK_0X120:
+        case REG_ADLAK_MC_CTL:
             return adlak_os_snprintf(buf, buf_size, "%s", "MC_CTL");
         case REG_ADLAK_MC_CLK_PHASE:
             return adlak_os_snprintf(buf, buf_size, "%s", "MC_CLK_PHASE");
@@ -741,84 +738,84 @@ int adlak_get_reg_name(int offset, char *buf, size_t buf_size) {
 static void adlak_reg_lst_init(struct adlak_hw_info *phw_info) {
     int idx = 0;
 
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X0;
+    phw_info->reg_lst[idx++] = REG_ADLAK_REV;
 
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X4;
+    phw_info->reg_lst[idx++] = REG_ADLAK_WAIT_TIMER;
     phw_info->reg_lst[idx++] = REG_ADLAK_SECURITY;
     // irq
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X10;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X14;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X18;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X1C;
+    phw_info->reg_lst[idx++] = REG_ADLAK_IRQ_MASKED;
+    phw_info->reg_lst[idx++] = REG_ADLAK_IRQ_MASK;
+    phw_info->reg_lst[idx++] = REG_ADLAK_IRQ_RAW;
+    phw_info->reg_lst[idx++] = REG_ADLAK_STS_REPORT;
     // power&clock
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X20;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X24;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X28;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X2C;
+    phw_info->reg_lst[idx++] = REG_ADLAK_SWRST;
+    phw_info->reg_lst[idx++] = REG_ADLAK_ADLAK_EN;
+    phw_info->reg_lst[idx++] = REG_ADLAK_CLK_AUTOCLK;
+    phw_info->reg_lst[idx++] = REG_ADLAK_CLK_IDLE_CNT;
     // debug
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X30;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X34;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X38;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X3C;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X40;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X44;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X48;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X4C;
+    phw_info->reg_lst[idx++] = REG_ADLAK_DBG_EN;
+    phw_info->reg_lst[idx++] = REG_ADLAK_DBG_SEL;
+    phw_info->reg_lst[idx++] = REG_ADLAK_DBG_SUB_SEL;
+    phw_info->reg_lst[idx++] = REG_ADLAK_DBG_DAT;
+    phw_info->reg_lst[idx++] = REG_ADLAK_DBG_SRAM_CTRL;
+    phw_info->reg_lst[idx++] = REG_ADLAK_DBG_SRAM_ADDR;
+    phw_info->reg_lst[idx++] = REG_ADLAK_DBG_SRAM_WDAT;
+    phw_info->reg_lst[idx++] = REG_ADLAK_DBG_SRAM_RDAT;
 
     // parser
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X50;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X54;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X58;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X5C;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X60;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X64;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X68;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X6C;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X70;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X74;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X78;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X7C;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X80;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X84;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X88;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X8C;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X90;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X9C;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XA0;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XA4;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XA8;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XAC;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XB0;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XB4;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XB8;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XBC;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PS_CTRL;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PS_STS;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PS_ERR_DAT;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PS_IDLE_STS;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PS_TIME_STAMP;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PS_RBF_BASE;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PS_RBF_SIZE;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PS_RBF_WPT;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PS_RBF_RPT;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PS_RBF_PPT;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PS_FINISH_ID;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PS_HCNT;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PS_OST;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PS_PEND_EN;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PS_PEND_VAL;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PS_MODULE_IDLE_STS;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PS_DBG_SW_ID;
+    phw_info->reg_lst[idx++] = REG_ADLAK_AB_AXI_PADDR;
+    phw_info->reg_lst[idx++] = REG_ADLAK_AB_CTL;
+    phw_info->reg_lst[idx++] = REG_ADLAK_AB_AXI_SADDR;
+    phw_info->reg_lst[idx++] = REG_ADLAK_AB_AXI_EADDR;
+    phw_info->reg_lst[idx++] = REG_ADLAK_AB_R_CS_PRIO;
+    phw_info->reg_lst[idx++] = REG_ADLAK_AB_R_LS_PRIO;
+    phw_info->reg_lst[idx++] = REG_ADLAK_AB_R_L2_PRIO;
+    phw_info->reg_lst[idx++] = REG_ADLAK_AB_W_PRIO;
+    phw_info->reg_lst[idx++] = REG_ADLAK_AB_AXI_USER;
     // smmu
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XC0;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XC4;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XC8;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XCC;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XD0;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XD4;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XD8;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XDC;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XE0;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XE4;
+    phw_info->reg_lst[idx++] = REG_ADLAK_SMMU_EN;
+    phw_info->reg_lst[idx++] = REG_ADLAK_SMMU_TTBR_L;
+    phw_info->reg_lst[idx++] = REG_ADLAK_SMMU_TTBR_H;
+    phw_info->reg_lst[idx++] = REG_ADLAK_SMMU_PRIO_POW2_0;
+    phw_info->reg_lst[idx++] = REG_ADLAK_SMMU_PRIO_POW2_1;
+    phw_info->reg_lst[idx++] = REG_ADLAK_SMMU_INV_CTL;
+    phw_info->reg_lst[idx++] = REG_ADLAK_SMMU_INV_VA;
+    phw_info->reg_lst[idx++] = REG_ADLAK_SMMU_DFT;
+    phw_info->reg_lst[idx++] = REG_ADLAK_SMMU_IVD_MDL;
+    phw_info->reg_lst[idx++] = REG_ADLAK_SMMU_IVD_VA;
     // pm
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XF0;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XF4;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XF8;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0XFC;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X100;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X104;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X108;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PM_EN;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PM_RBF_BASE;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PM_RBF_SIZE;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PM_RBF_WPT;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PM_RBF_RPT;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PM_STS;
+    phw_info->reg_lst[idx++] = REG_ADLAK_PM_UNIT;
     // AXI DRAM
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X110;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X114;
+    phw_info->reg_lst[idx++] = REG_ADLAK_AXIBRG_DX_CTL;
+    phw_info->reg_lst[idx++] = REG_ADLAK_AXIBRG_DX_HOLD;
     // AXI SRAM
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X118;
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X11C;
+    phw_info->reg_lst[idx++] = REG_ADLAK_AXIBRG_SX_CTL;
+    phw_info->reg_lst[idx++] = REG_ADLAK_AXIBRG_SX_HOLD;
 
-    phw_info->reg_lst[idx++] = REG_ADLAK_0X120;
+    phw_info->reg_lst[idx++] = REG_ADLAK_MC_CTL;
     phw_info->reg_lst[idx++] = REG_ADLAK_MC_CLK_PHASE;
     ASSERT(idx == REG_ADLAK_NUM_MAX);
 }
@@ -842,7 +839,10 @@ int adlak_hw_init(void *data) {
     struct adlak_hw_info *phw_info;
 
     AML_LOG_DEBUG("%s", __func__);
-    phw_info        = adlak_os_zalloc(sizeof(struct adlak_hw_info), ADLAK_GFP_KERNEL);
+    phw_info = adlak_os_zalloc(sizeof(struct adlak_hw_info), ADLAK_GFP_KERNEL);
+    if (!phw_info) {
+        return ERR(ENOMEM);
+    }
     padlak->hw_info = (void *)phw_info;
     adlak_reg_lst_init(padlak->hw_info);
 
@@ -850,7 +850,7 @@ int adlak_hw_init(void *data) {
 
     adlak_hal_enable(data, true);  // alda enable
 
-    phw_info->irq_cfg.mask_err = ADLAK_IRQ_MASK_PEND_TIMOUT | ADLAK_IRQ_MASK_APB_WAIT_TIMOUT |
+    phw_info->irq_cfg.mask_err = ADLAK_IRQ_MASK_PEND_TIMEOUT | ADLAK_IRQ_MASK_APB_WAIT_TIMEOUT |
                                  ADLAK_IRQ_MASK_PARSER_STOP_ERR | ADLAK_IRQ_MASK_INVALID_IOVA |
                                  ADLAK_IRQ_MASK_SW_TIMEOUT;
 
@@ -889,9 +889,7 @@ void adlak_hw_deinit(void *data) {
 
     adlak_hal_enable(data, false);  // alda disable
 
-    if (padlak->hw_info) {
-        adlak_os_free(padlak->hw_info);
-    }
+    adlak_os_free(padlak->hw_info);
 }
 int adlak_hal_submit(void *data, uint32_t wpt) {
     int                  ret    = ERR(NONE);
@@ -918,10 +916,13 @@ int adlak_check_dev_is_idle(void *data) {
     uint32_t              idel_sts, cnt;
     AML_LOG_DEBUG("%s", __func__);
     cnt = 0;
+    if (phw_info == NULL) {
+        return ERR(EIO);
+    }
     while (1) {
-        idel_sts = adlak_read32(phw_info->region, REG_ADLAK_0X8C);
+        idel_sts = adlak_read32(phw_info->region, REG_ADLAK_PS_MODULE_IDLE_STS);
         if (idel_sts != 0xFFFFFFFF) {
-            AML_LOG_WARN("REG_ADLAK_0X8C   : 0x%08X", idel_sts);
+            AML_LOG_WARN("REG_ADLAK_PS_MODULE_IDLE_STS   : 0x%08X", idel_sts);
         } else {
             break;
         }
@@ -945,7 +946,7 @@ void adlak_hal_set_preempt(void *data) {
     AML_LOG_DEBUG("%s", __func__);
     d.all             = 0;
     d.bitc.ps_preempt = 1;
-    adlak_write32(region, REG_ADLAK_0X50, d.all);
+    adlak_write32(region, REG_ADLAK_PS_CTRL, d.all);
 }
 
 int adlak_hal_check_preempt_is_done(void *data) {
@@ -953,14 +954,14 @@ int adlak_hal_check_preempt_is_done(void *data) {
     struct io_region *   region = padlak->hw_res.preg;
     uint32_t             val;
     AML_LOG_DEBUG("%s", __func__);
-    val = adlak_read32(region, REG_ADLAK_0X18);
+    val = adlak_read32(region, REG_ADLAK_IRQ_RAW);
 #if CONFIG_ADLAK_EMU_EN
     val = 0x04;
 #endif
 
     AML_LOG_DEBUG("IRQ_RAW = %#X", val);
     if (val & 0x04) {
-        adlak_write32(region, REG_ADLAK_0X18, 0x04);
+        adlak_write32(region, REG_ADLAK_IRQ_RAW, 0x04);
         return ERR(NONE);
     } else {
         if (ERR(NONE) == adlak_check_dev_is_idle(data)) {
@@ -976,14 +977,14 @@ int adlak_hal_save_parser_info(void *data, void *_parser_storage) {
     struct adlak_parser_storage *parser_storage = (struct adlak_parser_storage *)_parser_storage;
     struct io_region *           region         = padlak->hw_res.preg;
     AML_LOG_INFO("%s", __func__);
-    parser_storage->base_addr       = adlak_read32(region, REG_ADLAK_0X64);
-    parser_storage->size            = adlak_read32(region, REG_ADLAK_0X68);
-    parser_storage->rpt             = adlak_read32(region, REG_ADLAK_0X70);
-    parser_storage->wpt             = adlak_read32(region, REG_ADLAK_0X6C);
-    parser_storage->ppt             = adlak_read32(region, REG_ADLAK_0X74);
-    parser_storage->finish_id       = adlak_read32(region, REG_ADLAK_0X78);
-    parser_storage->timestamp       = adlak_read32(region, REG_ADLAK_0X60);
-    parser_storage->dbg_sw_id       = adlak_read32(region, REG_ADLAK_0X90);
+    parser_storage->base_addr       = adlak_read32(region, REG_ADLAK_PS_RBF_BASE);
+    parser_storage->size            = adlak_read32(region, REG_ADLAK_PS_RBF_SIZE);
+    parser_storage->rpt             = adlak_read32(region, REG_ADLAK_PS_RBF_RPT);
+    parser_storage->wpt             = adlak_read32(region, REG_ADLAK_PS_RBF_WPT);
+    parser_storage->ppt             = adlak_read32(region, REG_ADLAK_PS_RBF_PPT);
+    parser_storage->finish_id       = adlak_read32(region, REG_ADLAK_PS_FINISH_ID);
+    parser_storage->timestamp       = adlak_read32(region, REG_ADLAK_PS_TIME_STAMP);
+    parser_storage->dbg_sw_id       = adlak_read32(region, REG_ADLAK_PS_DBG_SW_ID);
     parser_storage->is_save_from_hw = 1;
     AML_LOG_DEBUG("get base addr     = [0x%08X]", parser_storage->base_addr);
     AML_LOG_DEBUG("get ppt           = [0x%08X]", parser_storage->ppt);
@@ -1002,19 +1003,19 @@ int adlak_hal_parser_resume(void *data, void *_parser_storage) {
     }
     AML_LOG_INFO("%s", __func__);
     // restore parser
-    adlak_write32(region, REG_ADLAK_0X64, parser_storage->base_addr);
-    adlak_write32(region, REG_ADLAK_0X68, parser_storage->size);
-    adlak_write32(region, REG_ADLAK_0X6C, parser_storage->wpt);
-    adlak_write32(region, REG_ADLAK_0X70, parser_storage->rpt);
-    adlak_write32(region, REG_ADLAK_0X74, parser_storage->ppt);
+    adlak_write32(region, REG_ADLAK_PS_RBF_BASE, parser_storage->base_addr);
+    adlak_write32(region, REG_ADLAK_PS_RBF_SIZE, parser_storage->size);
+    adlak_write32(region, REG_ADLAK_PS_RBF_WPT, parser_storage->wpt);
+    adlak_write32(region, REG_ADLAK_PS_RBF_RPT, parser_storage->rpt);
+    adlak_write32(region, REG_ADLAK_PS_RBF_PPT, parser_storage->ppt);
     AML_LOG_DEBUG("restore base addr = [0x%08X]", parser_storage->base_addr);
     AML_LOG_DEBUG("restore size      = [0x%08X]", parser_storage->size);
     AML_LOG_DEBUG("restore rpt       = [0x%08X]", parser_storage->rpt);
     AML_LOG_DEBUG("restore ppt       = [0x%08X]", parser_storage->ppt);
     if (0 != parser_storage->is_save_from_hw) {
-        adlak_write32(region, REG_ADLAK_0X78, parser_storage->finish_id);
-        adlak_write32(region, REG_ADLAK_0X60, parser_storage->timestamp);
-        adlak_write32(region, REG_ADLAK_0X90, parser_storage->dbg_sw_id);
+        adlak_write32(region, REG_ADLAK_PS_FINISH_ID, parser_storage->finish_id);
+        adlak_write32(region, REG_ADLAK_PS_TIME_STAMP, parser_storage->timestamp);
+        adlak_write32(region, REG_ADLAK_PS_DBG_SW_ID, parser_storage->dbg_sw_id);
         AML_LOG_DEBUG("restore finish_id = [0x%08X]", parser_storage->finish_id);
     }
 

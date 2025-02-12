@@ -113,6 +113,7 @@ int adlak_mem_alloc_request(struct adlak_context *context, struct adlak_buf_req 
     struct adlak_mem_obj *   mem     = &memory;
     AML_LOG_DEBUG("%s", __func__);
     AML_LOG_DEBUG("mem_alloc_request size:0x%lX bytes", (uintptr_t)pbuf_req->bytes);
+    pbuf_req->errcode = ADLAK_ALLOCATE_MEM_FAIL;
 
     // step1: allocate mem
     mm_info = mem->ops.alloc(&context->smmu_attr, pbuf_req);
@@ -156,6 +157,8 @@ int adlak_mem_alloc_request(struct adlak_context *context, struct adlak_buf_req 
         context->mem_alloced += mm_info->req.bytes;
     }
 
+    pbuf_req->errcode = ADLAK_SUCCESS;
+
     return ERR(NONE);
 err_attach:
 
@@ -173,14 +176,18 @@ int adlak_mem_free_request(struct adlak_context *context, uint64_t mem_handle) {
     struct adlak_mem_obj *   mem = &memory;
     AML_LOG_DEBUG("%s", __func__);
     if (0 != context->invoke_cnt) {
-        ret = -1;
+        ret = ADLAK_CONTEXT_BUSY;
         goto err;
+    }
+    if (unlikely(!mm_info)) {
+        AML_LOG_ERR("mem_handle is null");
+        return -EINVAL;
     }
 
     // step1: dettach from the mem list
     pmm_info_hd = (struct adlak_mem_handle *)adlak_context_dettach_buf(context, (void *)mm_info);
     if (NULL == pmm_info_hd) {
-        ret = -1;
+        ret = ADLAK_INVALID_MEM_HANDLE;
         AML_LOG_ERR("dettach mm_info to context failed!");
         goto err;
     }
@@ -199,7 +206,7 @@ int adlak_mem_free_request(struct adlak_context *context, uint64_t mem_handle) {
 
     // step3: free mem
     mem->ops.free(&context->smmu_attr, mm_info);
-    return 0;
+    return ADLAK_SUCCESS;
 err:
     return ret;
 }
@@ -210,6 +217,7 @@ int adlak_ext_mem_attach_request(struct adlak_context *        context,
     struct adlak_mem_handle *mm_info = NULL;
     struct adlak_mem_obj *   mem     = &memory;
     AML_LOG_DEBUG("%s", __func__);
+    pbuf_req->errcode = ADLAK_ALLOCATE_MEM_FAIL;
     if (ADLAK_PAGE_ALIGN(pbuf_req->bytes) != pbuf_req->bytes) {
         ret = -1;
         AML_LOG_ERR("mem size is not align with page_size.");
@@ -267,7 +275,7 @@ int adlak_ext_mem_attach_request(struct adlak_context *        context,
     pbuf_req->ret_desc.iova_addr = (uint64_t)(uintptr_t)mm_info->iova_addr;
     pbuf_req->ret_desc.phys_addr = (uint64_t)(uintptr_t)mm_info->phys_addr;
 
-    pbuf_req->errcode = 0;
+    pbuf_req->errcode = ADLAK_SUCCESS;
 
     // step3: attach to the mem list
     if (ERR(NONE) == ret) {
@@ -291,6 +299,10 @@ int adlak_ext_mem_dettach_request(struct adlak_context *context, uint64_t mem_ha
     struct adlak_mem_obj *   mem = &memory;
     AML_LOG_DEBUG("%s", __func__);
 
+    if (unlikely(!mm_info)) {
+        AML_LOG_ERR("mem_handle is null");
+        return -EINVAL;
+    }
     // step1: dettach from the tlb of smmu
     pmm_info_hd = (struct adlak_mem_handle *)adlak_context_dettach_buf(context, (void *)mm_info);
     if (NULL == pmm_info_hd) {

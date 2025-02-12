@@ -25,7 +25,6 @@
 #include "adlak_api.h"
 #include "adlak_common.h"
 #include "adlak_context.h"
-#include "adlak_device.h"
 
 #ifdef __cplusplus
 extern "C" {
