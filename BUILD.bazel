@@ -1,4 +1,5 @@
 load("//build/kernel/kleaf:kernel.bzl", "kernel_module")
+load("//common_drivers/project/kernel:kernel_select.bzl", "kernel_select")
 
 kernel_module(
     name = "adla",
@@ -11,10 +12,7 @@ kernel_module(
     outs = [
         "adla_core.ko",
     ],
-    kernel_build = select({
-        "//common:common_drivers_on_top_dir": "//common_drivers:amlogic",
-        "//conditions:default": "//common:amlogic",
-    }),
+    kernel_build = kernel_select(),
     visibility = ["//visibility:public"],
 )
 
