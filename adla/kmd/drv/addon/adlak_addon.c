@@ -119,8 +119,9 @@ int adlak_enable_save_context_time;
 int adlak_get_utilization(struct adlak_device *padlak, char *buf, size_t size) {
     struct adlak_workqueue *pwq             = &padlak->queue;
     struct adlak_task *ptask = NULL, *ptask_tmp = NULL;
-    struct adlak_caps_desc *uapi_caps = (struct adlak_caps_desc *)padlak->dev_caps.data;
-    int32_t utilization                     = -1;
+    struct adlak_caps_desc *uapi_caps       = (struct adlak_caps_desc *)padlak->dev_caps.data;
+    struct adlak_model_attr *pmodel_attr    = NULL;
+    int32_t utilization                     = 0;
     int count                               = 0;
     int buf_size                            = size;
     uint32_t time                           = 0;
@@ -155,9 +156,10 @@ int adlak_get_utilization(struct adlak_device *padlak, char *buf, size_t size) {
     }
     if (pwq->sched_num > 0) {
         list_for_each_entry_safe(ptask, ptask_tmp, &pwq->scheduled_list, head) {
+            pmodel_attr                 = adlak_get_model_attr(ptask->context, ptask->sub_tasks_idx);
 
             time = ptask->context->invoke_time_elapsed_total;
-            if (0 == time) {
+            if ((0 == time) || (pmodel_attr == NULL)) {
                 count += adlak_os_snprintf(buf + count, buf_size - count, "please wait ...\n");
             } else {
                 // nn utilization formula is
@@ -167,9 +169,9 @@ int adlak_get_utilization(struct adlak_device *padlak, char *buf, size_t size) {
                 // the result of "model_macc/1000/1000 * 1000000 /time" unit is 'Mops'
                 // dev_macc_count unit is 'Mops', represent adla computing power
                 // the final result represent unitilization of the current model running on adla, mul 100 which convert to percentage
-                n = ptask->context->macc_count *100;
+                n = pmodel_attr->macc_count *100;
                 base = dev_macc_count * time;
-                utilization = div64_u64(n, base);
+                utilization = div64_u64(n + base -1, base); //round up
             }
         }
     }
@@ -252,7 +254,7 @@ int adlak_set_dev_info(struct adlak_context *         context,
             break;
         case ADLAK_DEV_INFO_TYPE_MACC_COUNT :
             macc_count_value = (int64_t) info_req->value;
-            context->macc_count = macc_count_value;
+            // context->macc_count = macc_count_value;
             break;
         default :
             AML_LOG_ERR("not support set %d info.",info_req->info_type);

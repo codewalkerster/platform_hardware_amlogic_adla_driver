@@ -742,6 +742,7 @@ static struct adlak_model_attr *adlak_model_create(struct adlak_context *     co
     pmodel_attr->pm_cfg.profile_en       = psubmit_desc->profile_en;
     pmodel_attr->pm_cfg.profile_iova     = psubmit_desc->profile_iova;
     pmodel_attr->pm_cfg.profile_buf_size = psubmit_desc->profile_buf_size;
+    pmodel_attr->macc_count              = psubmit_desc->macc_count;
     pmodel_attr->pm_stat.pm_rpt          = 0;
     pmodel_attr->pm_stat.pm_wpt          = 0;
     pmodel_attr->cmq_buffer              = &context->padlak->cmq_buffer_public;

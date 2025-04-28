@@ -87,7 +87,6 @@ struct adlak_context {
     /* Calculate adla device utilization */
     uint32_t             invoke_time_elapsed_total;
     uint32_t             invoke_time_elapsed_tmp;
-    int64_t              macc_count; /* macc Bytes */
 
     adlak_os_sema_t ctx_idle;
 

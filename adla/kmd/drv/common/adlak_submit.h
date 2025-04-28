@@ -272,6 +272,8 @@ struct adlak_model_attr {
     struct adlak_cmq_buffer *cmq_buffer;
     int32_t hw_parser_v2_support;  // If non-zero, indicates that the hardware supports parser_v2
     struct adlak_cmd_buf_attr_inner cmd_buf_attr;
+
+    int64_t              macc_count; /* macc Bytes */
 };
 
 struct adlak_task {

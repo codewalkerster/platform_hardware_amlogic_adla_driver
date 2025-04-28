@@ -69,7 +69,7 @@ int adlak_create_context(void *adlak_device, struct adlak_context **p_context) {
 
     context->mem_alloced = 0;
 
-    context->macc_count = 0;
+    // context->macc_count = 0;
     context->invoke_time_elapsed_tmp = 0;
     context->invoke_time_elapsed_total = 0;
 
